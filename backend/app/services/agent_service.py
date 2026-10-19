@@ -30,6 +30,7 @@ from app.models.enums import Channel
 from app.models.message import Message
 from app.prompts import agent, fallbacks
 from app.services import reply_guard
+from app.services.knowledge_service import KnowledgeService
 from app.services.scheduling_service import SchedulingService
 from app.services.state_machine import Decision
 from app.tools import SPECS, record_answer, search_faq
@@ -50,9 +51,10 @@ class AgentTurn:
 
 
 class AgentService:
-    def __init__(self, llm: BedrockClient, scheduling: SchedulingService):
+    def __init__(self, llm: BedrockClient, scheduling: SchedulingService, knowledge: KnowledgeService):
         self.llm = llm
         self.scheduling = scheduling  # la tool record_answer lo usa para ofrecer huecos y reservar
+        self.knowledge = knowledge
 
     def respond(
         self, candidate: Candidate, history: list[Message], text: str, today: date, channel: Channel = Channel.TEXT
@@ -127,7 +129,7 @@ class AgentService:
     def _run_tool(self, call: dict, candidate: Candidate) -> dict:
         match call["name"]:
             case search_faq.NAME:
-                return search_faq.run(candidate, call["input"].get("question", ""))
+                return search_faq.run(candidate, call["input"].get("question", ""), self.knowledge)
             case record_answer.NAME:
                 # Solo una vez por turno: si lo intenta otra vez, no se vuelve a ejecutar advance().
                 return {"error": "La respuesta de este mensaje ya está registrada. Escribe tu mensaje."}

@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.repositories.database import get_connection, init_db
-from app.routes import candidates, chat, jobs, recruiters, voice
+from app.routes import candidates, chat, jobs, knowledge, recruiters, voice
 
 # Logs de la app (loggers "app.*") en la consola, desde INFO. Uvicorn solo configura
 # los suyos: sin esto, Python únicamente muestra WARNING o más. Solo "app", para que
@@ -35,5 +35,6 @@ app = FastAPI(title="Grupo Sazón — screening de repartidores", lifespan=lifes
 app.include_router(candidates.router)
 app.include_router(chat.router)
 app.include_router(jobs.router)
+app.include_router(knowledge.router)
 app.include_router(recruiters.router)
 app.include_router(voice.router)

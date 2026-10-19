@@ -9,6 +9,7 @@ from app.clients.aws_client import LLMError
 from app.models.candidate import Candidate
 from app.models.enums import Channel, Country, Identity, License, Stage
 from app.models.interview import Slot
+from app.models.knowledge import KnowledgeMatch
 from app.models.message import Message
 from app.services.agent_service import MAX_STEPS, AgentService
 from app.services.state_machine import Action
@@ -66,7 +67,19 @@ def tool_result(call) -> dict:
 
 def respond(llm, c=None, *texts):
     texts = texts or ("¿Hablo con Ana López?", "x")
-    return AgentService(llm, FakeScheduling()).respond(c or candidate(), history(*texts), texts[-1], TODAY)
+    return AgentService(llm, FakeScheduling(), FakeKnowledge()).respond(c or candidate(), history(*texts), texts[-1], TODAY)
+
+
+class FakeKnowledge:
+    def __init__(self, fail: bool = False):
+        self.fail = fail
+        self.questions = []
+
+    def search(self, question):
+        self.questions.append(question)
+        if self.fail:
+            raise LLMError("Titan caído")
+        return [KnowledgeMatch(question="¿Necesito vehículo propio?", answer="Sí, coche o moto.", score=0.6)]
 
 
 class FakeScheduling:
@@ -103,17 +116,27 @@ def test_turn_forces_record_answer_then_writes_the_reply():
     assert "carné de conducir" in tool_result(second)["objective"]  # el código le dice qué toca
 
 
-def test_question_is_answered_with_search_faq():
+@pytest.mark.parametrize("titan_down", [False, True])
+def test_question_is_answered_with_search_faq(titan_down):
+    knowledge = FakeKnowledge(fail=titan_down)
     llm = ScriptedLLM(
-        record(candidate_question="en qué ciudades hay servicio"),
-        faq("en qué ciudades hay servicio"),
-        say("Estamos en Barcelona, Madrid, Sevilla... ¿En cuál te gustaría repartir?"),
+        record(candidate_question="si hace falta moto propia"),
+        faq("¿Necesito vehículo propio para trabajar de repartidor?"),
+        say("Sí, necesitas coche o moto propios. ¿En qué ciudad te gustaría repartir?"),
     )
-    turn = respond(llm, candidate(stage=Stage.ZONE), "¿En qué ciudad?", "¿dónde estáis?")
+    turn = AgentService(llm, FakeScheduling(), knowledge).respond(
+        candidate(stage=Stage.ZONE), history("¿En qué ciudad?", "¿hace falta moto?"), "¿hace falta moto?", TODAY
+    )
 
     assert turn.decision.action == Action.ASK and turn.decision.candidate.reask_counts == {}
     assert "candidate_asked" in tool_result(llm.calls[1])
-    assert "Ciudades con servicio en España" in tool_result(llm.calls[2])["information"]
+    assert knowledge.questions == ["¿Necesito vehículo propio para trabajar de repartidor?"]
+    result = tool_result(llm.calls[2])
+    assert "Ciudades con servicio en España" in result["information"]
+    if titan_down:
+        assert result["faq"] == [] and "faq_note" in result
+    else:
+        assert result["faq"] == [{"question": "¿Necesito vehículo propio?", "answer": "Sí, coche o moto."}]
 
 
 def test_parallel_tool_calls_in_the_forced_step_all_get_a_result():
@@ -198,7 +221,7 @@ def test_voice_only_changes_how_the_reply_is_written():
     script = (record(identity_confirmed="yes"), say("¡Genial, Ana! 🙌 ¿Tienes carné?"))
     by_text = respond(ScriptedLLM(*script))
     voice_llm = ScriptedLLM(*script)
-    by_voice = AgentService(voice_llm, FakeScheduling()).respond(
+    by_voice = AgentService(voice_llm, FakeScheduling(), FakeKnowledge()).respond(
         candidate(), history("¿Hablo con Ana López?", "x"), "x", TODAY, channel=Channel.VOICE
     )
     assert (by_voice.decision.action, by_voice.decision.stage) == (by_text.decision.action, by_text.decision.stage)

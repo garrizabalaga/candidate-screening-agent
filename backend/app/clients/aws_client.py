@@ -1,13 +1,14 @@
-"""Cliente de Amazon Bedrock (Converse API).
+"""Clientes de Amazon Bedrock: el modelo de chat (Converse API) y el de embeddings.
 
-Solo sabe hablar con Bedrock: no conoce prompts, etapas ni candidatos. Los
-servicios lo instancian y le pasan el system prompt, los mensajes y, si quieren
-salida estructurada, la definición de la herramienta.
+Solo saben hablar con Bedrock: no conocen prompts, etapas ni candidatos. Los
+servicios los instancian y le pasan el system prompt, los mensajes y, si quieren
+salida estructurada, la definición de la herramienta (o el texto a convertir en vector).
 
 Credenciales: boto3 lee AWS_BEARER_TOKEN_BEDROCK del entorno (cargado desde el
 .env por core/config.py), así que la API key no pasa por este código.
 """
 
+import json
 from typing import Any
 
 import boto3
@@ -83,6 +84,34 @@ class BedrockClient:
             if use["name"] == tool["name"]:
                 return use["input"]
         raise LLMError(f"Bedrock response did not call tool {tool['name']}")
+
+
+EMBEDDING_DIMENSIONS = 1024
+
+
+class EmbeddingClient:
+    """Amazon Titan Text Embeddings V2, con invoke_model (la Converse API no hace embeddings).
+    Pide vectores normalizados: la similitud coseno entre dos de ellos es su producto escalar."""
+
+    def __init__(self, model_id: str, region: str = AWS_REGION, client: Any = None):
+        self.model_id = model_id
+        self._client = client or boto3.client(
+            "bedrock-runtime",
+            region_name=region,
+            config=Config(connect_timeout=5, read_timeout=10, retries={"max_attempts": 2, "mode": "standard"}),
+        )
+
+    def embed(self, text: str) -> list[float]:
+        body = json.dumps({"inputText": text, "dimensions": EMBEDDING_DIMENSIONS, "normalize": True})
+        try:
+            response = self._client.invoke_model(
+                modelId=self.model_id, body=body, contentType="application/json", accept="application/json"
+            )
+            return json.loads(response["body"].read())["embedding"]
+        except (BotoCoreError, ClientError) as e:
+            raise LLMError(f"Bedrock embedding failed: {e}") from e
+        except (KeyError, TypeError, ValueError) as e:
+            raise LLMError("Unexpected Bedrock embedding response") from e
 
 
 TRUNCATED = "truncated"

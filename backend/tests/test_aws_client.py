@@ -1,9 +1,12 @@
 """Tests del cliente de Bedrock con un cliente boto3 falso (sin red)."""
 
+import io
+import json
+
 import pytest
 from botocore.exceptions import ClientError
 
-from app.clients.aws_client import BedrockClient, LLMError, text_of, was_truncated
+from app.clients.aws_client import BedrockClient, EmbeddingClient, LLMError, text_of, was_truncated
 
 TOOL = {
     "name": "record_fields",
@@ -62,3 +65,26 @@ def test_max_tokens_stop_is_marked_as_truncated():
     cut = reply({"text": "Genial, Ana. ¿Tienes carné de"}) | {"stopReason": "max_tokens"}
     assert was_truncated(BedrockClient(model_id="m", client=FakeBoto(cut)).converse("sys", MESSAGES))
     assert not was_truncated(BedrockClient(model_id="m", client=FakeBoto(reply({"text": "ok"}))).converse("sys", MESSAGES))
+
+
+class FakeEmbeddingBoto:
+    def __init__(self, error=None):
+        self.error = error
+        self.last_kwargs = None
+
+    def invoke_model(self, **kwargs):
+        self.last_kwargs = kwargs
+        if self.error:
+            raise self.error
+        return {"body": io.BytesIO(json.dumps({"embedding": [0.6, 0.8], "inputTextTokenCount": 3}).encode())}
+
+
+def test_embed_asks_titan_for_a_normalized_vector():
+    fake = FakeEmbeddingBoto()
+    assert EmbeddingClient(model_id="titan", client=fake).embed("¿Necesito moto propia?") == [0.6, 0.8]
+    request = json.loads(fake.last_kwargs["body"])
+    assert fake.last_kwargs["modelId"] == "titan"
+    assert request == {"inputText": "¿Necesito moto propia?", "dimensions": 1024, "normalize": True}
+    error = ClientError({"Error": {"Code": "ThrottlingException", "Message": "slow down"}}, "InvokeModel")
+    with pytest.raises(LLMError):
+        EmbeddingClient(model_id="titan", client=FakeEmbeddingBoto(error)).embed("x")

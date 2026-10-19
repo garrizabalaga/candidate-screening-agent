@@ -6,8 +6,8 @@ import sqlite3
 from collections.abc import Callable, Iterator
 from functools import lru_cache
 
-from app.clients.aws_client import BedrockClient
-from app.core.config import BEDROCK_AGENT_MODEL_ID
+from app.clients.aws_client import BedrockClient, EmbeddingClient
+from app.core.config import BEDROCK_AGENT_MODEL_ID, BEDROCK_EMBEDDING_MODEL_ID
 from app.repositories.database import get_connection
 from app.services.summary_service import SummaryService
 from app.services.voice_requests import VoiceRequests
@@ -40,6 +40,12 @@ def _generate_summary(candidate_id: str) -> None:
         logger.exception("Background summary failed for candidate %s", candidate_id)
     finally:
         conn.close()
+
+
+@lru_cache
+def get_embeddings() -> EmbeddingClient:
+    """Cliente de embeddings (base de conocimiento), compartido como el de chat."""
+    return EmbeddingClient(model_id=BEDROCK_EMBEDDING_MODEL_ID)
 
 
 @lru_cache

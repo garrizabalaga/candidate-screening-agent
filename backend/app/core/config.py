@@ -33,6 +33,8 @@ AWS_REGION = os.getenv("AWS_REGION", "eu-north-1")
 # Modelo del agente (extrae vía tools y redacta). Perfil "eu.*": las peticiones no
 # salen de la UE (RGPD). Alternativas probadas: eu.amazon.nova-2-lite-v1:0 (más barato).
 BEDROCK_AGENT_MODEL_ID = os.getenv("BEDROCK_AGENT_MODEL_ID", "eu.anthropic.claude-sonnet-4-6")
+# Titan V2: está en la región (los datos no salen) y no depende de una suscripción de Marketplace.
+BEDROCK_EMBEDDING_MODEL_ID = os.getenv("BEDROCK_EMBEDDING_MODEL_ID", "amazon.titan-embed-text-v2:0")
 # URL pública del backend (túnel en la demo): con ella se construye el enlace de voz
 # que recibe el candidato en el mensaje de apertura.
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "http://127.0.0.1:8000").rstrip("/")

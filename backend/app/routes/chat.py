@@ -11,11 +11,12 @@ from collections.abc import Callable
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.clients.aws_client import BedrockClient
+from app.clients.aws_client import BedrockClient, EmbeddingClient
 from app.core.exceptions import CandidateNotFound
-from app.routes.dependencies import get_agent_llm, get_db, get_summary_job
+from app.routes.dependencies import get_agent_llm, get_db, get_embeddings, get_summary_job
 from app.services.agent_service import AgentService
 from app.services.chat_service import ChatService
+from app.services.knowledge_service import KnowledgeService
 from app.services.scheduling_service import SchedulingService
 
 logger = logging.getLogger(__name__)
@@ -37,11 +38,12 @@ def chat(
     background: BackgroundTasks,
     conn: sqlite3.Connection = Depends(get_db),
     llm: BedrockClient = Depends(get_agent_llm),
+    embeddings: EmbeddingClient = Depends(get_embeddings),
     summary_job: Callable[[str], None] = Depends(get_summary_job),
 ) -> ChatResponse:
     logger.info("Chat request: candidate=%s text=%r", req.candidate_id, req.text)
     start = time.monotonic()
-    service = ChatService(conn, AgentService(llm, SchedulingService(conn)))
+    service = ChatService(conn, AgentService(llm, SchedulingService(conn), KnowledgeService(conn, embeddings)))
     try:
         result = service.handle_message(req.candidate_id, req.text)
     except CandidateNotFound:

@@ -40,14 +40,15 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
-from app.clients.aws_client import BedrockClient
+from app.clients.aws_client import BedrockClient, EmbeddingClient
 from app.core.config import ELEVENLABS_AGENT_ID, VOICE_DEBOUNCE_SECONDS, VOICE_LLM_API_KEY
 from app.models.enums import Channel
 from app.prompts import voice as voice_prompts
 from app.repositories.candidate_repository import CandidateRepository
-from app.routes.dependencies import get_agent_llm, get_db, get_summary_job, get_voice_requests
+from app.routes.dependencies import get_agent_llm, get_db, get_embeddings, get_summary_job, get_voice_requests
 from app.services.agent_service import AgentService
 from app.services.chat_service import FALLBACK_REPLY, ChatService
+from app.services.knowledge_service import KnowledgeService
 from app.services.scheduling_service import SchedulingService
 from app.services.voice_requests import VoiceRequests
 
@@ -81,6 +82,7 @@ def chat_completions(
     background: BackgroundTasks,
     conn: sqlite3.Connection = Depends(get_db),
     llm: BedrockClient = Depends(get_agent_llm),
+    embeddings: EmbeddingClient = Depends(get_embeddings),
     summary_job: Callable[[str], None] = Depends(get_summary_job),
     requests: VoiceRequests = Depends(get_voice_requests),
 ) -> StreamingResponse:
@@ -94,7 +96,7 @@ def chat_completions(
     if candidate is None:
         raise HTTPException(status_code=404, detail="candidate not found")
 
-    service = ChatService(conn, AgentService(llm, SchedulingService(conn)))
+    service = ChatService(conn, AgentService(llm, SchedulingService(conn), KnowledgeService(conn, embeddings)))
     number = requests.register(candidate_id)  # al llegar, no tras la espera
 
     def stream() -> Iterator[str]:
