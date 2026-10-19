@@ -1,135 +1,72 @@
-"""Dashboard de recruiters de Grupo Sazón: inicio con las métricas del proceso.
+"""Dashboard de Grupo Sazón: punto de entrada y menú lateral.
 
 Arrancar (con la API levantada): streamlit run app.py
-Las páginas están en pages/ (Streamlit las añade al menú lateral).
 
-Las métricas se calculan aquí, a partir de GET /candidates. Con el volumen de la
-demo es suficiente; con miles de candidatos irían a un endpoint de la API (o a
-una vista agregada en la base de datos) para no descargar todos los registros.
+Tiene dos partes, para dos públicos distintos:
+- Panel de recruiters (Inicio, Candidatos, Calendario): el menú lateral.
+- Vista del candidato (simulador): fuera del menú, se abre con el botón de abajo.
+  En producción el candidato no usa este front (escribe por WhatsApp y habla en
+  la página de voz de ElevenLabs); aquí sirve para probar la conversación.
+
+El menú automático de Streamlit (todo lo que hay en pages/) se oculta y se dibuja
+a mano, para que el simulador no parezca una página más del panel.
 """
 
-from collections import Counter
-from datetime import datetime, timezone
-from statistics import median
+from pathlib import Path
 
-import altair as alt
-import pandas as pd
 import streamlit as st
 
 import api_client
-from ui import OUTCOME_LABEL, REASON_LABEL, STAGE_LABEL, call
+from ui import COUNTRY_LABEL, call
 
-st.set_page_config(page_title="Grupo Sazón · Selección", page_icon="🛵", layout="wide")
-st.title("🛵 Grupo Sazón · Selección de repartidores")
-st.caption(f"API: {api_client.API_URL}")
+ASSETS = Path(__file__).parent / "assets"
 
-candidates = call(api_client.list_candidates)
-if not candidates:
-    st.info("Todavía no hay candidatos. Empieza en la página **Candidatos**.")
-    st.stop()
+inicio =st.Page("pages/0_Inicio.py", title="Inicio", icon="🏠", default=True)
+candidatos = st.Page("pages/1_Candidatos.py", title="Candidatos", icon="📋")
+calendario = st.Page("pages/3_Calendario.py", title="Calendario", icon="📅")
+simulador = st.Page("pages/2_Simulador.py", title="Vista del candidato", icon="🧪")
 
+page = st.navigation([inicio, candidatos, calendario, simulador], position="hidden")
 
-def pct(part: int, whole: int) -> str:
-    return f"{part / whole:.0%}" if whole else "—"
+# Streamlit no permite anclar algo al fondo del lateral. Con CSS: el lateral pasa a
+# ser una columna flexible a toda altura, cada capa que contiene el botón se estira
+# (flex: 1) y el bloque del botón se empuja abajo (margin-top: auto); si Streamlit lo
+# estira para llenar el hueco, coloca su contenido al final (justify-content). No depende de cuántas
+# capas intermedias ponga Streamlit; si cambia su estructura, el botón solo vuelve a
+# quedar justo debajo del menú.
+SIDEBAR_CSS = """
+<style>
+[data-testid="stSidebarContent"] { display: flex; flex-direction: column; }
+[data-testid="stSidebarUserContent"],
+[data-testid="stSidebarUserContent"] div:has(.st-key-candidate_view) {
+    flex: 1; display: flex; flex-direction: column;
+}
+.st-key-candidate_view { margin-top: auto; justify-content: flex-end; }
+</style>
+"""
 
-
-def ts(iso: str) -> datetime:
-    return datetime.fromisoformat(iso)
-
-
-now = datetime.now(timezone.utc)
-contacted = [c for c in candidates if c["contacted_at"]]
-responded = [c for c in contacted if c["last_candidate_message_at"]]
-finished = [c for c in contacted if c["outcome"]]
-qualified = [c for c in candidates if c["outcome"] == "qualified" or c["stage"] == "scheduling"]
-booked = [c for c in candidates if c["interview"]]
-upcoming = [c for c in booked if ts(c["interview"]["starts_at"]) > now]
-in_review = [c for c in candidates if c["outcome"] == "manual_review"]
-
-# --- Cifras clave: responden al problema del cliente -----------------------------------
-# 60% no contestaba al teléfono -> tasa de respuesta. 80% del tiempo en no aptos -> lo
-# que le llega al recruiter es solo la entrevista agendada o la revisión manual.
-
-st.subheader("Cifras clave")
-k = st.columns(5)
-k[0].metric("Candidatos", len(candidates), help="Aplicaciones registradas")
-k[1].metric("Tasa de respuesta", pct(len(responded), len(contacted)), help="Contactados que han contestado al menos una vez")
-k[2].metric("Conversaciones terminadas", pct(len(finished), len(contacted)), help="Contactados con un resultado final")
-k[3].metric("Entrevistas próximas", len(upcoming), help="Entrevistas agendadas a partir de ahora")
-k[4].metric("Revisión manual", len(in_review), help="Casos que esperan a un recruiter")
-
-durations = [
-    (ts(c["last_candidate_message_at"]) - ts(c["contacted_at"])).total_seconds() / 60
-    for c in finished
-    if c["outcome"] != "abandoned" and c["last_candidate_message_at"]
-]
-if durations:
-    minutes = median(durations)
-    duration = f"{minutes:.0f} min" if minutes < 120 else f"{minutes / 60:.1f} h"
-    st.caption(
-        "Duración mediana de una conversación terminada (del primer contacto al último mensaje "
-        f"del candidato): {duration}"
-    )
-
-
-def bars(data: dict[str, int], title: str) -> None:
-    """Barras horizontales de una sola serie, en el orden dado (no alfabético)."""
-    df = pd.DataFrame({"Etiqueta": list(data), "Candidatos": list(data.values())})
-    chart = (
-        alt.Chart(df, title=title)
-        .mark_bar(cornerRadiusEnd=4, height={"band": 0.6})
-        .encode(
-            y=alt.Y("Etiqueta:N", sort=None, title=None),
-            x=alt.X("Candidatos:Q", title=None, axis=alt.Axis(tickMinStep=1, grid=True)),
-            tooltip=["Etiqueta", "Candidatos"],
+if page.url_path != simulador.url_path:  # en la vista del candidato no hay menú de recruiter
+    st.logo(ASSETS / "logo.svg", size="large", icon_image=ASSETS / "icon.svg")
+    with st.sidebar:
+        st.markdown(SIDEBAR_CSS, unsafe_allow_html=True)
+        # Quién usa el panel (uno de los recruiters): personaliza el inicio. Sin login en la demo.
+        recruiters = call(api_client.list_recruiters)
+        by_id = {r["id"]: r for r in recruiters}
+        # "me" vive aparte del widget: Streamlit borra el estado de un widget en las páginas
+        # que no lo dibujan (la vista del candidato) y se perdería al volver.
+        st.session_state.setdefault("me", recruiters[0]["id"])
+        st.session_state["me_select"] = st.session_state["me"]
+        st.selectbox(
+            "Soy", list(by_id), key="me_select",
+            format_func=lambda i: f"{by_id[i]['name']} · {COUNTRY_LABEL[by_id[i]['country']]}",
+            on_change=lambda: st.session_state.update(me=st.session_state["me_select"]),
         )
-    )
-    labels = chart.mark_text(align="left", dx=4).encode(text="Candidatos:Q")
-    st.altair_chart((chart + labels).properties(height=max(120, 36 * len(df))), width="stretch")
+        st.page_link(inicio)
+        st.page_link(candidatos)
+        st.page_link(calendario)
+        with st.container(key="candidate_view"):
+            st.divider()
+            if st.button("🧪 Probar como candidato", type="primary", width="stretch"):
+                st.switch_page(simulador)
 
-
-left, right = st.columns(2)
-
-with left:
-    bars(
-        {
-            "Aplicaron": len(candidates),
-            "Contactados": len(contacted),
-            "Respondieron": len(responded),
-            "Aptos": len(qualified),
-            "Entrevista agendada": len(booked),
-        },
-        "Embudo",
-    )
-    outcomes = Counter(c["outcome"] for c in candidates)
-    bars({OUTCOME_LABEL[o]: outcomes[o] for o in OUTCOME_LABEL if outcomes[o]}, "Resultados")
-
-with right:
-    abandoned = Counter(c["stage"] for c in candidates if c["outcome"] == "abandoned")
-    if abandoned:
-        bars({STAGE_LABEL[s]: abandoned[s] for s in STAGE_LABEL if abandoned[s]}, "Abandono: última etapa alcanzada")
-    else:
-        st.markdown("**Abandono: última etapa alcanzada**")
-        st.caption("Nadie ha abandonado todavía.")
-
-    reasons = Counter(c["disqualification_reason"] for c in candidates if c["outcome"] == "disqualified")
-    if reasons:
-        bars({REASON_LABEL.get(r, r): n for r, n in reasons.most_common()}, "Motivos de descarte")
-    else:
-        st.markdown("**Motivos de descarte**")
-        st.caption("Ningún candidato descartado todavía.")
-
-with st.expander("Ver los datos en tabla"):
-    st.dataframe(
-        pd.DataFrame(
-            [
-                {"Métrica": "Contactados", "Valor": len(contacted)},
-                {"Métrica": "Respondieron", "Valor": len(responded)},
-                {"Métrica": "Terminadas", "Valor": len(finished)},
-                {"Métrica": "Aptos", "Valor": len(qualified)},
-                {"Métrica": "Entrevistas agendadas", "Valor": len(booked)},
-                {"Métrica": "Revisión manual", "Valor": len(in_review)},
-            ]
-        ),
-        hide_index=True,
-    )
+page.run()

@@ -10,6 +10,7 @@ from app.clients.aws_client import BedrockClient
 from app.core.config import BEDROCK_AGENT_MODEL_ID
 from app.repositories.database import get_connection
 from app.services.summary_service import SummaryService
+from app.services.voice_requests import VoiceRequests
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,12 @@ def _generate_summary(candidate_id: str) -> None:
         logger.exception("Background summary failed for candidate %s", candidate_id)
     finally:
         conn.close()
+
+
+@lru_cache
+def get_voice_requests() -> VoiceRequests:
+    """Uno para toda la app: tiene que ver todas las peticiones de voz para saber cuál es la última."""
+    return VoiceRequests()
 
 
 def get_summary_job() -> Callable[[str], None]:

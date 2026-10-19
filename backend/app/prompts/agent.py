@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 from app.models.candidate import Candidate
 from app.models.message import Message
-from app.models.enums import Stage
+from app.models.enums import Channel, Stage
 from app.prompts.slots import numbered
 from app.prompts.stages import question
 from app.services.state_machine import STAGE_FIELD
@@ -26,6 +26,17 @@ Cómo conversar:
 - Como mucho un emoji, y solo si encaja (una despedida, una buena noticia).
 - Haz como mucho una pregunta por mensaje: la que pide el objetivo, sin añadir otras.
 - Si te preguntan, di que eres una IA."""
+
+# Se añade tras PERSONA cuando la conversación es por voz: corrige lo que allí es
+# propio del chat (formato, emojis). Lo que se decide en el turno no cambia.
+VOICE = """Ahora estáis en una llamada de voz: lo que escribas se leerá en voz alta tal cual.
+- Escribe como se habla: frases cortas y sencillas, sin emojis, listas ni paréntesis.
+- Puntúa con normalidad (¿?, ¡!, comas, puntos): la voz los usa para entonar. Si el objetivo es preguntar,
+  termina con una pregunta de verdad, entre signos de interrogación.
+- Fechas y horas como se dicen: "el martes 20 de octubre a las nueve y media", no "20/10, 9:30".
+- Si tienes que ofrecer huecos de entrevista, dilos seguidos ("el primero…, el segundo…") y pídele que diga cuál
+  le va mejor, en vez de pedirle un número.
+- No menciones "este chat": si el objetivo habla de responderle por el chat, di "por WhatsApp"."""
 
 TURN_RULES = f"""Cómo funciona cada turno:
 1. Llama a {record_answer.NAME} con lo que dice el candidato en su ÚLTIMO mensaje.
@@ -72,10 +83,11 @@ _FIELD_LABELS = {
 }
 
 
-def system_prompt(candidate: Candidate, today: date) -> str:
+def system_prompt(candidate: Candidate, today: date, channel: Channel = Channel.TEXT) -> str:
     """Contexto del turno, con el estado ANTES de procesar el mensaje."""
+    voice = [VOICE, ""] if channel == Channel.VOICE else []
     lines = [
-        PERSONA, "", TURN_RULES, "", FIELD_RULES, "",
+        PERSONA, "", *voice, TURN_RULES, "", FIELD_RULES, "",
         "Contexto:",
         f"- Hoy es {_WEEKDAYS[today.weekday()]} {today.isoformat()}. Calendario: {_calendar(today)}.",
         f"- Candidato: {candidate.full_name} (nombre de pila: {candidate.full_name.split()[0]}). "

@@ -26,6 +26,7 @@ from datetime import date
 
 from app.clients.aws_client import BedrockClient, LLMError, text_of, tool_uses, was_truncated
 from app.models.candidate import Candidate
+from app.models.enums import Channel
 from app.models.message import Message
 from app.prompts import agent, fallbacks
 from app.services import reply_guard
@@ -53,10 +54,21 @@ class AgentService:
         self.llm = llm
         self.scheduling = scheduling  # la tool record_answer lo usa para ofrecer huecos y reservar
 
-    def respond(self, candidate: Candidate, history: list[Message], text: str, today: date) -> AgentTurn:
+    def respond(
+        self, candidate: Candidate, history: list[Message], text: str, today: date, channel: Channel = Channel.TEXT
+    ) -> AgentTurn:
         """`history` es la conversación hasta el último mensaje del candidato, incluido.
-        Lanza LLMError solo si el código no ha podido decidir."""
-        system = agent.system_prompt(candidate, today)
+        Lanza LLMError solo si el código no ha podido decidir. El canal solo cambia
+        cómo se redacta el mensaje: la decisión es la misma por chat que por voz."""
+        turn = self._respond(candidate, history, text, today, channel)
+        if channel == Channel.VOICE:
+            turn.reply = reply_guard.for_voice(turn.reply)
+        return turn
+
+    def _respond(
+        self, candidate: Candidate, history: list[Message], text: str, today: date, channel: Channel
+    ) -> AgentTurn:
+        system = agent.system_prompt(candidate, today, channel)
         messages = agent.conversation(history)
 
         # 1. record_answer forzada. Temperatura 0: la extracción tiene que ser repetible.

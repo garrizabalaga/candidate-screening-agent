@@ -75,14 +75,6 @@ class BedrockClient:
         except (KeyError, TypeError) as e:
             raise LLMError("Unexpected Bedrock response shape") from e
 
-    def generate_text(self, system: str, messages: list[dict], **kwargs: Any) -> str:
-        """Respuesta en texto plano."""
-        content = self.converse(system, messages, **kwargs)
-        text = text_of(content)
-        if not text:
-            raise LLMError("Bedrock response has no text")
-        return text
-
     def generate_structured(self, system: str, messages: list[dict], tool: dict, **kwargs: Any) -> dict:
         """Respuesta estructurada: el `input` con el que el modelo llamó a `tool`.
         Validarlo contra el modelo Pydantic es cosa del servicio."""

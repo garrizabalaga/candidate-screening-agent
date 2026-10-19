@@ -1,4 +1,8 @@
-"""Simulador de candidato: chatear con Guille como si fueras el candidato.
+"""Vista del candidato (simulador): hablar con Guille como si fueras el candidato.
+
+No es parte del panel de recruiters: en producción el candidato escribe por
+WhatsApp y, si lo prefiere, habla por voz con el enlace del mensaje de apertura.
+Aquí el chat sustituye a WhatsApp, y ese enlace se puede pulsar desde el propio chat.
 
 Experiencia de chat:
 - El chat es un fragmento (@st.fragment): al enviar un mensaje solo se vuelve a
@@ -16,8 +20,10 @@ import streamlit as st
 import api_client
 from ui import OUTCOME_LABEL, STAGE_LABEL, call, candidate_label, render_message
 
-st.set_page_config(page_title="Simulador", page_icon="💬", layout="centered")
-st.title("💬 Simulador de candidato")
+st.set_page_config(page_title="Vista del candidato", page_icon="🧪", layout="centered")
+st.page_link("pages/0_Inicio.py", label="Volver al panel de recruiters", icon="⬅️")
+st.title("🧪 Vista del candidato")
+st.caption("Lo que vive el candidato. En producción escribe por WhatsApp o habla por voz; aquí lo simulas.")
 
 candidates = call(api_client.list_candidates)
 if not candidates:

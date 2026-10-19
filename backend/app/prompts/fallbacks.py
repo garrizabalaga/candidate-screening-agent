@@ -13,7 +13,7 @@ from app.prompts.slots import format_slot, numbered
 from app.prompts.stages import closed_options, rephrase
 from app.services.state_machine import Action, Decision
 
-_QUESTION_EN = {
+QUESTION_EN = {
     Stage.IDENTITY: "Are you {name}? I'm writing about your delivery driver application.",
     Stage.LICENSE: "Do you have a valid car or motorbike driving licence?",
     Stage.ZONE: "Which city would you like to deliver in? It doesn't have to be where you live.",
@@ -63,7 +63,7 @@ def _english(d: Decision, c: Candidate) -> str:
     name = c.full_name.split()[0]
     match d.action:
         case Action.ASK | Action.REASK:
-            return _QUESTION_EN[d.stage].format(name=c.full_name)
+            return QUESTION_EN[d.stage].format(name=c.full_name)
         case Action.CONFIRM if d.stage == Stage.LICENSE:
             return "This position requires a valid car or motorbike licence. Do you have one?"
         case Action.CONFIRM:

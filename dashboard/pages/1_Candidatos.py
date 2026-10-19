@@ -94,9 +94,15 @@ selection = st.dataframe(
 
 # --- Detalle del candidato seleccionado ------------------------------------------------
 
-if not selection.selection.rows:
-    st.stop()
-c = rows[selection.selection.rows[0]]
+# Una fila seleccionada, o el candidato que se abrió desde otra página (p. ej. "Revisar"
+# en el inicio). Seleccionar una fila tiene prioridad y descarta el que venía de fuera.
+if selection.selection.rows:
+    st.session_state.pop("open_candidate", None)
+    c = rows[selection.selection.rows[0]]
+else:
+    c = next((x for x in candidates if x["id"] == st.session_state.get("open_candidate")), None)
+    if c is None:
+        st.stop()
 
 st.divider()
 head, action = st.columns([4, 1])
@@ -169,4 +175,5 @@ with data:
         st.rerun()
 with chat:
     st.markdown("**Conversación**")
-    show_conversation(call(api_client.get_messages, c["id"]), c["country"])
+    with st.container(height=520):  # caja con scroll propio: la conversación no estira la página
+        show_conversation(call(api_client.get_messages, c["id"]), c["country"])
