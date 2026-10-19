@@ -45,6 +45,6 @@ def reminders(
         now = now.replace(tzinfo=timezone.utc)  # sin zona horaria se interpreta como UTC
     sent = ReengagementService(conn, now=lambda: now).run_reminders()
     for s in sent:
-        if s.action == ReminderAction.CLOSE:  # abandonada: la conversación se cierra, resumen
+        if s.action == ReminderAction.CLOSE:  # se cierra como abandonada: resumen
             background.add_task(summary_job, s.candidate_id)
     return RemindersResponse(sent=sent)

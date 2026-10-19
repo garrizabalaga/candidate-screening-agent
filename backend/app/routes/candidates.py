@@ -27,7 +27,7 @@ router = APIRouter(prefix="/candidates")
 class ApplicationRequest(BaseModel):
     full_name: str = Field(min_length=1)
     phone: str = Field(min_length=1)
-    country: Country  # de la oferta a la que aplicó
+    country: Country
 
 
 @router.post("", response_model=Candidate, status_code=201)
@@ -45,7 +45,7 @@ class ReviewRequest(BaseModel):
 
 
 class ReviewResponse(BaseModel):
-    message_sent: str  # lo que le ha llegado al candidato por el chat
+    message_sent: str
 
 
 @router.post("/{candidate_id}/review", response_model=ReviewResponse)

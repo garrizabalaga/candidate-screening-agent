@@ -1,9 +1,5 @@
-"""Job de primer contacto: escribe a los candidatos que han aplicado y todavía
-no han recibido ningún mensaje.
-
-No lo dispara ningún mensaje del candidato. En la demo lo lanza un botón
-(POST /jobs/first-contact); en producción, un scheduler (EventBridge). El
-código que se ejecuta es el mismo.
+"""Job de primer contacto: escribe a los candidatos que han aplicado y todavía no
+han recibido ningún mensaje. En la demo lo lanza un botón; en producción, un scheduler.
 """
 
 import sqlite3
@@ -15,10 +11,8 @@ from app.models.message import Message
 from app.repositories.candidate_repository import CandidateRepository
 from app.repositories.message_repository import MessageRepository
 
-# Texto fijo, no del LLM: en WhatsApp Business un mensaje que inicia la empresa
-# tiene que ser una plantilla aprobada por Meta (el enlace iría como variable o
-# botón de la plantilla). Pregunta la identidad, así que el candidato contesta ya a
-# la etapa `identity`, por chat o por voz: el enlace lleva a la llamada con Guille.
+# Texto fijo: en WhatsApp un mensaje que inicia la empresa tiene que ser una plantilla
+# aprobada por Meta (el enlace, como variable o botón de la plantilla).
 OPENING_MESSAGE = (
     "¡Hola! Soy Guille, el asistente virtual de selección de Grupo Sazón 👋 "
     "Te escribo por tu solicitud como repartidor. Antes de empezar, ¿hablo con {full_name}?\n"

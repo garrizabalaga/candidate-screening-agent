@@ -1,17 +1,9 @@
 """Cuál es la última petición de voz de cada candidato.
 
-ElevenLabs lanza el turno en cuanto cree que el candidato ha terminado. Si sigue
-hablando tras una pausa, descarta esa petición y envía otra con la frase completa.
-Para ElevenLabs no pasa nada (supone un LLM sin estado), pero nuestro turno guarda
-y avanza la máquina de estados. Por eso cada petición espera un margen corto antes
-de procesarse y, si mientras tanto ha llegado otra del mismo candidato, se retira:
-solo se procesa la última.
-
-Tradeoffs (aceptados para la demo):
-- Suma el margen a todos los turnos de voz.
-- Una pausa más larga que el margen se sigue procesando como dos turnos.
-- En memoria: un solo proceso. La solución de producción sería confirmar cada turno
-  cuando aparece en el transcript de ElevenLabs (ver docs/architecture.md).
+Si el candidato hace una pausa y sigue hablando, ElevenLabs descarta la petición y
+envía otra con la frase completa. Cada petición espera un margen y, si mientras
+tanto llega otra del mismo candidato, se retira: solo se procesa la última.
+Tradeoffs en docs/architecture.md §16.
 """
 
 import threading
@@ -20,7 +12,7 @@ import threading
 class VoiceRequests:
     def __init__(self):
         self._lock = threading.Lock()
-        self._latest: dict[str, int] = {}  # candidato -> número de su última petición
+        self._latest: dict[str, int] = {}
 
     def register(self, candidate_id: str) -> int:
         """Apunta una petición nueva del candidato y devuelve su número."""

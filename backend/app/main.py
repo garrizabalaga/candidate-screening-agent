@@ -23,7 +23,6 @@ logging.getLogger("app").setLevel(logging.INFO)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Al arrancar: crear las tablas si no existen.
     conn = get_connection()
     init_db(conn)
     conn.close()

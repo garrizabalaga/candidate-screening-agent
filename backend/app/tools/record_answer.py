@@ -22,6 +22,7 @@ from app.prompts.slots import format_slot, numbered
 from app.prompts.stages import closed_options, question, rephrase
 from app.services.scheduling_service import SchedulingService, SlotTaken
 from app.services.state_machine import Action, Decision, advance, with_slots
+from app.tools import search_faq
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +37,9 @@ def run(candidate: Candidate, raw: dict, text: str, today: date, scheduling: Sch
     extracted = parse(raw)
     decision = advance(candidate, extracted, text, today)
 
-    # Acaba de ser apto: el código elige los huecos a ofrecer.
     if decision.action == Action.OFFER_SLOTS and not decision.candidate.offered_slots:
         decision = with_slots(decision, scheduling.available_slots(decision.candidate))
 
-    # Ha elegido hueco: se reserva. Si se ha ocupado mientras tanto, se le ofrecen otros.
     elif decision.action == Action.BOOKED:
         try:
             scheduling.book(decision.candidate, decision.slot)
@@ -88,7 +87,7 @@ def parse(raw: dict) -> ExtractedFields:
         return ExtractedFields.model_validate(valid)
 
 
-def result(decision: Decision, candidate_question: str | None, search_tool: str) -> dict:
+def result(decision: Decision, candidate_question: str | None) -> dict:
     """Lo que la tool devuelve al agente: qué ha decidido el código."""
     out = {
         "objective": objective(decision),
@@ -96,7 +95,7 @@ def result(decision: Decision, candidate_question: str | None, search_tool: str)
         "conversation_closed": decision.action in CLOSING_ACTIONS,
     }
     if candidate_question:
-        out["candidate_asked"] = f'"{candidate_question}": búscalo con {search_tool} y respóndelo antes del objetivo.'
+        out["candidate_asked"] = f'"{candidate_question}": búscalo con {search_faq.NAME} y respóndelo antes del objetivo.'
     return out
 
 

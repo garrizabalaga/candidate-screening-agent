@@ -106,7 +106,7 @@ def test_turn_forces_record_answer_then_writes_the_reply():
     llm = ScriptedLLM(record(identity_confirmed="yes"), say("¡Genial, Ana! ¿Tienes carné?"))
     turn = respond(llm, None, "¿Hablo con Ana López?", "sí soy yo")
 
-    assert turn.reply == "¡Genial, Ana! ¿Tienes carné?" and not turn.used_fallback
+    assert turn.reply == "¡Genial, Ana! ¿Tienes carné?"
     assert (turn.decision.action, turn.decision.stage) == (Action.ASK, Stage.LICENSE)
     assert turn.decision.candidate.fields.identity_confirmed == Identity.YES
 
@@ -193,7 +193,6 @@ def test_failure_before_the_decision_raises(first):
 def test_failure_after_the_decision_uses_the_fixed_text(after_decision):
     llm = ScriptedLLM(record(identity_confirmed="yes"), *after_decision)
     turn = respond(llm)
-    assert turn.used_fallback
     assert turn.decision.stage == Stage.LICENSE  # la decisión se mantiene
     assert turn.reply == "¿Puedes conducir un coche o una moto? Es decir, ¿tienes carné de coche o de moto en vigor?"
 
@@ -203,7 +202,7 @@ def test_failure_after_the_decision_uses_the_fixed_text(after_decision):
 def test_invalid_reply_is_rewritten_once():
     llm = ScriptedLLM(record(identity_confirmed="yes"), say("Perfecto, Ana."), say("Perfecto, Ana. ¿Tienes carné?"))
     turn = respond(llm)
-    assert turn.reply == "Perfecto, Ana. ¿Tienes carné?" and not turn.used_fallback
+    assert turn.reply == "Perfecto, Ana. ¿Tienes carné?"
     rewrite = llm.calls[2]["messages"][-1]["content"][0]["text"]
     assert "Mensaje del sistema" in rewrite and "no tiene ninguna" in rewrite
 
@@ -213,8 +212,7 @@ def test_invented_salary_falls_back_to_the_fixed_text():
     llm = ScriptedLLM(record(candidate_question="cuánto se paga"), salary, salary)
     c = candidate(stage=Stage.AVAILABILITY, fields={"identity_confirmed": "yes", "license": "yes", "city": "Madrid"})
     turn = respond(llm, c, "¿Disponibilidad?", "¿cuánto se paga?")
-    assert turn.used_fallback
-    assert "12" not in turn.reply
+    assert turn.reply == "¿Buscas algo a jornada completa, a media jornada o solo para fines de semana?"  # texto fijo
 
 
 def test_voice_only_changes_how_the_reply_is_written():
@@ -233,5 +231,5 @@ def test_truncated_reply_is_rewritten():
     cut = [{"text": "Genial, Ana. ¿Tienes carné de"}, {"truncated": True}]
     llm = ScriptedLLM(record(identity_confirmed="yes"), cut, say("Genial, Ana. ¿Tienes carné?"))
     turn = respond(llm)
-    assert turn.reply == "Genial, Ana. ¿Tienes carné?" and not turn.used_fallback
+    assert turn.reply == "Genial, Ana. ¿Tienes carné?"
     assert "cortado" in llm.calls[2]["messages"][-1]["content"][0]["text"]

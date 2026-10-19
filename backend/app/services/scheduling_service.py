@@ -39,7 +39,7 @@ class SchedulingService:
         self,
         conn: sqlite3.Connection,
         now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
-        recruiters: list[Recruiter] | None = None,  # inyectable en los tests
+        recruiters: list[Recruiter] | None = None,
     ):
         self.conn = conn
         self.interviews = InterviewRepository(conn)
@@ -52,7 +52,7 @@ class SchedulingService:
         preferred = [s for s in free if _matches(s, candidate)]
 
         offered: list[Slot] = []
-        for pool in (preferred, free):  # primero su franja; luego, lo más próximo
+        for pool in (preferred, free):
             for slot in pool:
                 if len(offered) == limit:
                     break

@@ -1,22 +1,9 @@
-"""El agente: conversa y llama a tools. Las tools ejecutan el código.
+"""El agente: conversa y llama a tools; las tools ejecutan el código.
 
-Un turno:
-1. Llamada con record_answer FORZADA. Así la máquina de estados se ejecuta en
-   todos los turnos, aunque el mensaje no aporte nada ("jaja"): las repreguntas,
-   confirmaciones y descartes siguen siendo deterministas.
-2. El código valida los argumentos (Pydantic), ejecuta advance() y devuelve al
-   agente el objetivo de su mensaje.
-3. Llamadas en modo auto: el agente puede consultar search_faq y termina
-   escribiendo el mensaje. Hay un tope de pasos para que no se quede en bucle.
-4. El código valida el mensaje (reply_guard). Si no pasa, se pide una
-   reescritura; si sigue sin pasar, se usa el texto fijo de esa acción.
-
-Si algo falla ANTES de que el código decida (Bedrock caído, el agente no llama a
-record_answer), se lanza LLMError y el turno no cuenta. Si falla DESPUÉS, la
-decisión ya está tomada y se comunica con el texto fijo.
-
-El agente nunca guarda nada: devuelve la decisión y el texto, y el servicio de
-chat lo persiste todo junto.
+record_answer va forzada en todos los turnos, así la máquina de estados siempre
+decide (aunque el mensaje sea "jaja"). Si algo falla ANTES de decidir, LLMError y
+el turno no cuenta; si falla DESPUÉS, la decisión se comunica con el texto fijo.
+El agente no guarda nada: el servicio de chat lo persiste todo junto.
 """
 
 import json
@@ -37,9 +24,7 @@ from app.tools import SPECS, record_answer, search_faq
 
 logger = logging.getLogger(__name__)
 
-# Pasos en modo auto después de record_answer (p. ej. search_faq + respuesta = 2).
-MAX_STEPS = 3
-# Reescrituras permitidas si el mensaje no pasa la validación.
+MAX_STEPS = 3  # en modo auto, tras record_answer: p. ej. search_faq + respuesta = 2
 MAX_REWRITES = 1
 
 
@@ -47,13 +32,12 @@ MAX_REWRITES = 1
 class AgentTurn:
     decision: Decision
     reply: str
-    used_fallback: bool = False  # para logs/métricas: cuántas veces falla el agente
 
 
 class AgentService:
     def __init__(self, llm: BedrockClient, scheduling: SchedulingService, knowledge: KnowledgeService):
         self.llm = llm
-        self.scheduling = scheduling  # la tool record_answer lo usa para ofrecer huecos y reservar
+        self.scheduling = scheduling
         self.knowledge = knowledge
 
     def respond(
@@ -81,7 +65,7 @@ class AgentService:
 
         # 2. El código decide (y, si toca, ofrece huecos o reserva).
         decision, extracted = record_answer.run(candidate, call["input"], text, today, self.scheduling)
-        result = record_answer.result(decision, extracted.candidate_question, search_faq.NAME)
+        result = record_answer.result(decision, extracted.candidate_question)
         # El modelo puede llamar a varias tools a la vez (p. ej. también search_faq):
         # la API exige un resultado para cada llamada.
         results = [
@@ -96,7 +80,7 @@ class AgentService:
             logger.exception("Agent failed after the decision for candidate %s", candidate.id)
             reply = None
         if reply is None:
-            return AgentTurn(decision=decision, reply=fallbacks.fallback(decision), used_fallback=True)
+            return AgentTurn(decision=decision, reply=fallbacks.fallback(decision))
         return AgentTurn(decision=decision, reply=reply)
 
     def _write(self, system: str, messages: list[dict], decision: Decision) -> str | None:

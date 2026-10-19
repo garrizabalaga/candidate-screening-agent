@@ -160,8 +160,8 @@ def test_unclear_license_confirmation_goes_to_manual_review():
     d = turn(d.candidate, "bueno, lo tengo caducado", license=License.UNCLEAR)
     assert (d.action, d.stage) == (Action.ASK, Stage.ZONE)
     assert d.candidate.fields.license == License.UNCLEAR
-    assert d.new_flag.stage == Stage.LICENSE
-    assert d.new_flag.raw_answer == "bueno, lo tengo caducado"
+    assert d.candidate.review_flags[-1].stage == Stage.LICENSE
+    assert d.candidate.review_flags[-1].raw_answer == "bueno, lo tengo caducado"
 
 
 def test_out_of_order_no_is_confirmed_and_flow_resumes_at_the_current_stage():
@@ -229,7 +229,7 @@ def test_doubtful_eliminatory_goes_to_review_after_two_reasks_and_the_flow_conti
         d = turn(c, raw, **extracted)
         c = d.candidate
     assert (d.action, d.stage) == (Action.ASK, next_stage)
-    assert (d.new_flag.stage, d.new_flag.raw_answer) == (stage, "lo tengo en trámite")  # el recruiter ve la respuesta literal
+    assert (d.candidate.review_flags[-1].stage, d.candidate.review_flags[-1].raw_answer) == (stage, "lo tengo en trámite")
 
 
 def test_past_start_date_is_reasked():

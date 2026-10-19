@@ -1,11 +1,8 @@
 """Job de recordatorios: reengancha a los candidatos que dejan de contestar.
 
-Como el primer contacto, no lo dispara ningún mensaje: en la demo lo lanza un
-botón (POST /jobs/reminders, con un `now` simulado) y en producción un scheduler.
-
-Referencia: el momento en que el candidato dejó de contestar, es decir, su
-último mensaje o, si nunca ha contestado, la apertura. Los recordatorios no la
-mueven, así que los plazos (+2 h, +24 h, +72 h) cuentan siempre desde ahí.
+Los plazos (+2 h, +24 h, +72 h) cuentan desde que dejó de contestar (su último
+mensaje o, si nunca contestó, la apertura); los recordatorios no los mueven.
+En la demo lo lanza un botón con un `now` simulado; en producción, un scheduler.
 """
 
 import sqlite3

@@ -23,15 +23,14 @@ from dotenv import load_dotenv
 
 from app.models.enums import Country
 
-ROOT_DIR = Path(__file__).resolve().parents[2]  # app/core/config.py -> raíz del repo
+ROOT_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT_DIR / "data"
 
 load_dotenv(ROOT_DIR / ".env")
 
 DATABASE_PATH = Path(os.getenv("DATABASE_PATH", DATA_DIR / "screening.db"))
 AWS_REGION = os.getenv("AWS_REGION", "eu-north-1")
-# Modelo del agente (extrae vía tools y redacta). Perfil "eu.*": las peticiones no
-# salen de la UE (RGPD). Alternativas probadas: eu.amazon.nova-2-lite-v1:0 (más barato).
+# Perfil "eu.*": las peticiones no salen de la UE (RGPD).
 BEDROCK_AGENT_MODEL_ID = os.getenv("BEDROCK_AGENT_MODEL_ID", "eu.anthropic.claude-sonnet-4-6")
 # Titan V2: está en la región (los datos no salen) y no depende de una suscripción de Marketplace.
 BEDROCK_EMBEDDING_MODEL_ID = os.getenv("BEDROCK_EMBEDDING_MODEL_ID", "amazon.titan-embed-text-v2:0")

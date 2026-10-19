@@ -69,7 +69,7 @@ def value(v) -> str:
     """Un campo del screening en lenguaje natural."""
     if v is None:
         return "—"
-    if isinstance(v, dict):  # experiencia
+    if isinstance(v, dict):
         years = v["years"]
         platforms = ", ".join(v["platforms"]) or "sin plataformas"
         return "Sin experiencia" if years == 0 else f"{years:g} años ({platforms})"

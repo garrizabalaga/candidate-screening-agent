@@ -52,7 +52,7 @@ def test_with_slots_stores_the_offer_or_goes_to_review_if_there_are_none():
 
     none_free = with_slots(d, [])
     assert none_free.action == Action.MANUAL_REVIEW
-    assert none_free.new_flag.reason == "no_slots_available"
+    assert none_free.candidate.review_flags[-1].reason == "no_slots_available"
 
 
 def test_choosing_a_slot_books_it():
@@ -66,7 +66,7 @@ def test_none_fits_goes_to_manual_review_with_the_literal_answer():
     d = turn(scheduling_candidate(), "ninguno, trabajo esos días", chosen_slot="none")
     assert d.action == Action.MANUAL_REVIEW
     assert d.candidate.outcome == Outcome.MANUAL_REVIEW
-    assert (d.new_flag.reason, d.new_flag.raw_answer) == ("no_slot_fits", "ninguno, trabajo esos días")
+    assert (d.candidate.review_flags[-1].reason, d.candidate.review_flags[-1].raw_answer) == ("no_slot_fits", "ninguno, trabajo esos días")
 
 
 def test_unclear_choice_reasks_twice_then_manual_review():
@@ -77,7 +77,7 @@ def test_unclear_choice_reasks_twice_then_manual_review():
     assert (d.action, d.attempt) == (Action.OFFER_SLOTS, 2)
     d = turn(d.candidate, "ya veremos")
     assert d.action == Action.MANUAL_REVIEW
-    assert d.new_flag.reason == "scheduling_unclear"
+    assert d.candidate.review_flags[-1].reason == "scheduling_unclear"
 
 
 def test_a_question_repeats_the_slots_without_counting():
