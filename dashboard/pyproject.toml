@@ -1,0 +1,17 @@
+[project]
+name = "sazon-dashboard"
+version = "0.1.0"
+description = "Dashboard de recruiters de Grupo Sazón (Streamlit). Solo habla con la API del backend."
+requires-python = ">=3.11"
+dependencies = [
+    "streamlit>=1.40",
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+    "tzdata",  # zonas horarias para zoneinfo (Windows no las trae)
+]
+
+# No es un paquete que se importe: son scripts que lanza `streamlit run app.py`.
+# El pyproject solo declara las dependencias (pip install -e .).
+[tool.setuptools]
+packages = []
+py-modules = []

@@ -1,0 +1,14 @@
+[
+  {"city": "Madrid", "country": "ES", "aliases": []},
+  {"city": "Barcelona", "country": "ES", "aliases": []},
+  {"city": "Valencia", "country": "ES", "aliases": ["València"]},
+  {"city": "Sevilla", "country": "ES", "aliases": ["Seville"]},
+  {"city": "Málaga", "country": "ES", "aliases": []},
+  {"city": "Bilbao", "country": "ES", "aliases": ["Bilbo"]},
+  {"city": "Zaragoza", "country": "ES", "aliases": []},
+  {"city": "Ciudad de México", "country": "MX", "aliases": ["CDMX", "DF", "Mexico City"]},
+  {"city": "Guadalajara", "country": "MX", "aliases": []},
+  {"city": "Monterrey", "country": "MX", "aliases": []},
+  {"city": "Puebla", "country": "MX", "aliases": []},
+  {"city": "Querétaro", "country": "MX", "aliases": []}
+]
