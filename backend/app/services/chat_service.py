@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from app.clients.aws_client import LLMError
 from app.core.exceptions import CandidateNotFound
-from app.models.enums import Language, Outcome
+from app.models.enums import Channel, Language, Outcome
 from app.models.message import Message
 from app.repositories.candidate_repository import CandidateRepository
 from app.repositories.message_repository import MessageRepository
@@ -41,7 +41,7 @@ class ChatService:
         self.agent = agent
         self.now = now  # inyectable: los tests y la demo usan un reloj simulado
 
-    def handle_message(self, candidate_id: str, text: str) -> "ChatResult":
+    def handle_message(self, candidate_id: str, text: str, channel: Channel = Channel.TEXT) -> "ChatResult":
         now = self.now()
 
         # 1. Cargar candidato e historial, y guardar su mensaje antes de nada: si
@@ -61,7 +61,9 @@ class ChatService:
             # 2-4. El agente registra la respuesta (tool -> máquina de estados) y escribe el mensaje.
             #      Si la tool reserva una entrevista, la reserva queda en la transacción abierta
             #      y se confirma junto con el estado y la respuesta (paso 5).
-            turn = self.agent.respond(candidate, (history + [incoming])[-HISTORY_LIMIT:], text, now.date())
+            turn = self.agent.respond(
+                candidate, (history + [incoming])[-HISTORY_LIMIT:], text, now.date(), channel=channel
+            )
         except LLMError:
             logger.exception("LLM failed for candidate %s", candidate_id)
             self.conn.rollback()  # el turno no cuenta: no puede quedar nada a medias

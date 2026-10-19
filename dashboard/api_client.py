@@ -11,11 +11,18 @@ import httpx
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent / ".env")
-API_URL = os.getenv("API_URL", "http://localhost:8000")
+# 127.0.0.1 y no localhost: en Windows, "localhost" prueba antes IPv6 (::1), uvicorn
+# solo escucha en IPv4 y cada petición pierde segundos hasta reintentar.
+API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 
 # El chat espera al agente (2-3 llamadas al LLM): más margen que el resto.
 TIMEOUT = 15
 CHAT_TIMEOUT = 60
+
+# Un solo cliente para todo el dashboard: reutiliza la conexión. httpx.request() crea
+# uno nuevo en cada llamada (conexión y configuración SSL nuevas): ~0,4 s por petición.
+# El módulo se importa una vez por proceso, así que el cliente sobrevive a los reruns.
+_client = httpx.Client(base_url=API_URL)
 
 
 class APIError(Exception):
@@ -24,7 +31,7 @@ class APIError(Exception):
 
 def _request(method: str, path: str, timeout: float = TIMEOUT, **kwargs):
     try:
-        response = httpx.request(method, f"{API_URL}{path}", timeout=timeout, **kwargs)
+        response = _client.request(method, path, timeout=timeout, **kwargs)
         response.raise_for_status()
     except httpx.HTTPStatusError as e:
         raise APIError(f"{e.response.status_code}: {e.response.text}") from e
@@ -54,12 +61,7 @@ def review(candidate_id: str, decision: str) -> str:
 
 def get_summary(candidate_id: str) -> dict | None:
     """El resumen post-conversación, o None si todavía no se ha generado."""
-    try:
-        return _request("GET", f"/candidates/{candidate_id}/summary")
-    except APIError as e:
-        if str(e).startswith("404"):
-            return None
-        raise
+    return _request("GET", f"/candidates/{candidate_id}/summary")
 
 
 def generate_summary(candidate_id: str) -> dict:

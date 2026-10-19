@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="40" viewBox="0 0 220 40">
+  <rect x="2" y="4" width="32" height="32" rx="9" fill="#eb6834"/>
+  <text x="18" y="27" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="17" font-weight="700" fill="#ffffff">S</text>
+  <text x="44" y="20" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="15" font-weight="700" fill="#898781">Grupo Sazón</text>
+  <text x="44" y="35" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#898781">Selección de repartidores</text>
+</svg>

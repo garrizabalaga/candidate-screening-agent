@@ -18,6 +18,7 @@ from app.services.candidate_service import CandidateService
 from app.services.review_service import NoSlotsAvailable, NotInReview, ReviewService
 from app.services.scheduling_service import SchedulingService
 from app.services.summary_service import SummaryService
+from app.repositories.candidate_repository import CandidateRepository
 from app.repositories.summary_repository import SummaryRepository
 
 router = APIRouter(prefix="/candidates")
@@ -70,12 +71,13 @@ def review_candidate(
     return ReviewResponse(message_sent=text)
 
 
-@router.get("/{candidate_id}/summary", response_model=Summary)
-def get_summary(candidate_id: str, conn: sqlite3.Connection = Depends(get_db)) -> Summary:
-    summary = SummaryRepository(conn).get(candidate_id)
-    if summary is None:
-        raise HTTPException(status_code=404, detail="summary not found")
-    return summary
+@router.get("/{candidate_id}/summary", response_model=Summary | None)
+def get_summary(candidate_id: str, conn: sqlite3.Connection = Depends(get_db)) -> Summary | None:
+    """El resumen, o null si todavía no se ha generado (es lo normal mientras la
+    conversación sigue abierta: no es un error). 404 solo si el candidato no existe."""
+    if CandidateRepository(conn).get(candidate_id) is None:
+        raise HTTPException(status_code=404, detail="candidate not found")
+    return SummaryRepository(conn).get(candidate_id)
 
 
 @router.post("/{candidate_id}/summary", response_model=Summary)

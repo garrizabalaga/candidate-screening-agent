@@ -34,6 +34,19 @@ def clean(reply: str) -> str:
     return _THINKING.sub("", reply).strip()
 
 
+_EMOJI = re.compile("[\U0001F000-\U0001FAFF☀-➿️‍]")
+_FORMATTING = re.compile(r"[*_#`•]")
+
+
+def for_voice(reply: str) -> str:
+    """El mensaje tal como se va a leer en voz alta. El prompt de voz ya lo pide;
+    esto lo garantiza también en los textos fijos: un emoji o un asterisco suenan
+    raro en el TTS, y en una llamada no hay "este chat" (el seguimiento va por WhatsApp)."""
+    text = _FORMATTING.sub("", _EMOJI.sub("", reply))
+    text = text.replace("por este chat", "por WhatsApp")
+    return " ".join(text.split())  # sin saltos de línea ni espacios dobles
+
+
 def problems(reply: str, decision: Decision, context: str) -> list[str]:
     """Lista de incumplimientos (vacía si el mensaje es válido). `context` es todo
     lo que el agente tenía delante (prompt, resultados de tools, conversación):

@@ -67,3 +67,10 @@ class Language(StrEnum):
 class Country(StrEnum):
     ES = "ES"
     MX = "MX"
+
+
+class Channel(StrEnum):
+    """Por dónde habla el candidato. Solo cambia cómo se redacta el mensaje, no lo que se decide."""
+
+    TEXT = "text"    # chat (WhatsApp / simulador)
+    VOICE = "voice"  # llamada desde el navegador (ElevenLabs): el mensaje se lee en voz alta

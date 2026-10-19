@@ -10,16 +10,19 @@ import sqlite3
 from collections.abc import Callable
 from datetime import datetime, timezone
 
+from app.core.config import PUBLIC_BASE_URL
 from app.models.message import Message
 from app.repositories.candidate_repository import CandidateRepository
 from app.repositories.message_repository import MessageRepository
 
 # Texto fijo, no del LLM: en WhatsApp Business un mensaje que inicia la empresa
-# tiene que ser una plantilla aprobada por Meta. Termina con la pregunta de
-# identidad, así que el candidato contesta ya a la etapa `identity`.
+# tiene que ser una plantilla aprobada por Meta (el enlace iría como variable o
+# botón de la plantilla). Pregunta la identidad, así que el candidato contesta ya a
+# la etapa `identity`, por chat o por voz: el enlace lleva a la llamada con Guille.
 OPENING_MESSAGE = (
     "¡Hola! Soy Guille, el asistente virtual de selección de Grupo Sazón 👋 "
-    "Te escribo por tu solicitud como repartidor. Antes de empezar, ¿hablo con {full_name}?"
+    "Te escribo por tu solicitud como repartidor. Antes de empezar, ¿hablo con {full_name}?\n"
+    "Si prefieres hacerlo por llamada, pulsa aquí: {voice_url}"
 )
 
 
@@ -40,7 +43,9 @@ class OutreachService:
         contacted = []
         for candidate in self.candidates.list_pending_contact():
             now = self.now()
-            text = OPENING_MESSAGE.format(full_name=candidate.full_name)
+            text = OPENING_MESSAGE.format(
+                full_name=candidate.full_name, voice_url=f"{PUBLIC_BASE_URL}/voice/{candidate.id}"
+            )
             candidate.contacted_at = now
             with self.conn:
                 self.messages.add(Message(candidate_id=candidate.id, role="agent", text=text, created_at=now))

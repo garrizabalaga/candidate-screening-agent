@@ -33,6 +33,18 @@ AWS_REGION = os.getenv("AWS_REGION", "eu-north-1")
 # Modelo del agente (extrae vía tools y redacta). Perfil "eu.*": las peticiones no
 # salen de la UE (RGPD). Alternativas probadas: eu.amazon.nova-2-lite-v1:0 (más barato).
 BEDROCK_AGENT_MODEL_ID = os.getenv("BEDROCK_AGENT_MODEL_ID", "eu.anthropic.claude-sonnet-4-6")
+# URL pública del backend (túnel en la demo): con ella se construye el enlace de voz
+# que recibe el candidato en el mensaje de apertura.
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+# Agente de voz de ElevenLabs: /voice/{candidate_id} redirige a su página (talk-to).
+ELEVENLABS_AGENT_ID = os.getenv("ELEVENLABS_AGENT_ID", "")
+# Clave que ElevenLabs envía (Authorization: Bearer) al llamar a /voice/llm. El
+# endpoint queda expuesto a internet (ngrok): sin ella, cualquiera podría escribir
+# en la conversación de un candidato. Vacía = sin comprobar (solo en local).
+VOICE_LLM_API_KEY = os.getenv("VOICE_LLM_API_KEY", "")
+# Margen que espera cada turno de voz antes de procesarse, por si ElevenLabs lo
+# sustituye por una versión ampliada (el candidato hizo una pausa y siguió hablando).
+VOICE_DEBOUNCE_SECONDS = float(os.getenv("VOICE_DEBOUNCE_SECONDS", "1.5"))
 
 # Repreguntas por campo antes de aplicar la regla de "sigue sin estar claro".
 MAX_REASKS = 2
