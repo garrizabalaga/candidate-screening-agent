@@ -32,6 +32,7 @@ MAX_REWRITES = 1
 class AgentTurn:
     decision: Decision
     reply: str
+    used_fallback: bool = False  # lo usan los evals: un texto fijo cuenta como fallo de redacción
 
 
 class AgentService:
@@ -65,7 +66,7 @@ class AgentService:
 
         # 2. El código decide (y, si toca, ofrece huecos o reserva).
         decision, extracted = record_answer.run(candidate, call["input"], text, today, self.scheduling)
-        result = record_answer.result(decision, extracted.candidate_question)
+        result = record_answer.result(decision, extracted)
         # El modelo puede llamar a varias tools a la vez (p. ej. también search_faq):
         # la API exige un resultado para cada llamada.
         results = [
@@ -80,7 +81,7 @@ class AgentService:
             logger.exception("Agent failed after the decision for candidate %s", candidate.id)
             reply = None
         if reply is None:
-            return AgentTurn(decision=decision, reply=fallbacks.fallback(decision))
+            return AgentTurn(decision=decision, reply=fallbacks.fallback(decision), used_fallback=True)
         return AgentTurn(decision=decision, reply=reply)
 
     def _write(self, system: str, messages: list[dict], decision: Decision) -> str | None:

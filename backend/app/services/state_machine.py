@@ -82,6 +82,10 @@ def advance(candidate: Candidate, extracted: ExtractedFields, raw_text: str, tod
     if extracted.language is not None:
         c.language = extracted.language
 
+    # Lenguaje inapropiado: sin discutir ni avisar, lo revisa una persona.
+    if extracted.inappropriate:
+        return _to_manual_review(c, c.stage, "inappropriate_language", raw_text)
+
     if c.stage == Stage.SCHEDULING:
         return _schedule(c, extracted, raw_text)
 
@@ -269,7 +273,8 @@ def _apply_fallback(c: Candidate, stage: Stage, raw_text: str) -> None:
         case Stage.IDENTITY | Stage.LICENSE | Stage.ZONE:
             _flag_for_review(c, stage, raw_text)
         case _:
-            setattr(c.fields, STAGE_FIELD[stage], UNCLEAR)
+            # Validado (no setattr): "unclear" pasa a ser el valor del enum del campo.
+            c.fields = ScreeningFields.model_validate(c.fields.model_dump() | {STAGE_FIELD[stage]: UNCLEAR})
 
 
 def _flag_for_review(c: Candidate, stage: Stage, raw_text: str) -> None:

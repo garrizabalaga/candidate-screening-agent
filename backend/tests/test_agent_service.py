@@ -215,6 +215,14 @@ def test_invented_salary_falls_back_to_the_fixed_text():
     assert turn.reply == "¿Buscas algo a jornada completa, a media jornada o solo para fines de semana?"  # texto fijo
 
 
+@pytest.mark.parametrize("sentiment, tone", [("frustrated", True), ("neutral", False)])
+def test_sentiment_adds_a_tone_hint_but_does_not_change_the_decision(sentiment, tone):
+    llm = ScriptedLLM(record(identity_confirmed="yes", sentiment=sentiment), say("¿Tienes carné?"))
+    turn = respond(llm)
+    assert (turn.decision.action, turn.decision.stage) == (Action.ASK, Stage.LICENSE)
+    assert ("tone" in tool_result(llm.calls[1])) == tone
+
+
 def test_voice_only_changes_how_the_reply_is_written():
     script = (record(identity_confirmed="yes"), say("¡Genial, Ana! 🙌 ¿Tienes carné?"))
     by_text = respond(ScriptedLLM(*script))

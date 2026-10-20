@@ -38,6 +38,7 @@ FLAG_LABEL = {
     "no_slot_fits": "Ningún hueco de entrevista le encaja",
     "scheduling_unclear": "No eligió hueco de entrevista",
     "no_slots_available": "No había huecos libres",
+    "inappropriate_language": "Lenguaje inapropiado hacia el asistente",
 }
 VALUE_LABEL = {
     "yes": "Sí", "no": "No", "unclear": "No está claro",

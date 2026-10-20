@@ -260,6 +260,14 @@ def test_disqualification_wins_over_manual_review():
     assert d.candidate.outcome == Outcome.DISQUALIFIED
 
 
+@pytest.mark.parametrize("stage", [Stage.LICENSE, Stage.SCHEDULING])
+def test_inappropriate_language_goes_straight_to_manual_review(stage):
+    d = turn(candidate_at(stage), "eres un bot inútil", inappropriate=True, license=License.YES)
+    assert (d.action, d.candidate.outcome) == (Action.MANUAL_REVIEW, Outcome.MANUAL_REVIEW)
+    flag = d.candidate.review_flags[-1]
+    assert (flag.stage, flag.reason, flag.raw_answer) == (stage, "inappropriate_language", "eres un bot inútil")
+
+
 def test_message_after_done_is_closed():
     c = candidate_at(Stage.DONE)
     d = turn(c, license=License.NO)

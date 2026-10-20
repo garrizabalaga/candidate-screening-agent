@@ -69,6 +69,12 @@ class ExtractedFields(ScreeningFields):
     # si dice que ninguno le va. No es un dato del screening: decide la reserva.
     chosen_slot: int | Literal["none"] | None = None
 
+    # Insultos, acoso o contenido ofensivo hacia el asistente o la empresa: el caso pasa a un recruiter.
+    inappropriate: bool = False
+
+    # Cómo está el candidato: solo cambia el tono del mensaje, no la decisión.
+    sentiment: Literal["neutral", "frustrated", "confused"] = "neutral"
+
 
 # --- Estado de la conversación ------------------------------------------------
 
