@@ -28,7 +28,7 @@ DATA_DIR = ROOT_DIR / "data"
 
 load_dotenv(ROOT_DIR / ".env")
 
-DATABASE_PATH = Path(os.getenv("DATABASE_PATH", DATA_DIR / "screening.db"))
+DATABASE_PATH = Path(os.getenv("DATABASE_PATH", DATA_DIR / "demo.db"))
 AWS_REGION = os.getenv("AWS_REGION", "eu-north-1")
 # Perfil "eu.*": las peticiones no salen de la UE (RGPD).
 BEDROCK_AGENT_MODEL_ID = os.getenv("BEDROCK_AGENT_MODEL_ID", "eu.anthropic.claude-sonnet-4-6")
