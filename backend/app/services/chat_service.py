@@ -39,7 +39,7 @@ class ChatService:
         self.candidates = CandidateRepository(conn)
         self.messages = MessageRepository(conn)
         self.agent = agent
-        self.now = now  # inyectable: los tests y la demo usan un reloj simulado
+        self.now = now
 
     def handle_message(self, candidate_id: str, text: str, channel: Channel = Channel.TEXT) -> "ChatResult":
         now = self.now()
@@ -76,7 +76,6 @@ class ChatService:
         updated.last_candidate_message_at = now
         updated.reminders_sent = 0  # ha contestado: la secuencia de recordatorios empieza de nuevo
 
-        # 5. Estado y respuesta se guardan juntos o no se guarda ninguno.
         with self.conn:
             self.candidates.update(updated)
             self.messages.add(Message(candidate_id=candidate_id, role="agent", text=turn.reply, created_at=now))
@@ -87,4 +86,4 @@ class ChatService:
 @dataclass
 class ChatResult:
     reply: str
-    closed: bool = False  # la conversación se ha cerrado en este turno
+    closed: bool = False

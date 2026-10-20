@@ -9,6 +9,7 @@ from app.clients.aws_client import LLMError
 from app.models.candidate import Candidate
 from app.models.enums import Channel, Country, Identity, License, Stage
 from app.models.interview import Slot
+from app.models.knowledge import KnowledgeMatch
 from app.models.message import Message
 from app.services.agent_service import MAX_STEPS, AgentService
 from app.services.state_machine import Action
@@ -66,7 +67,19 @@ def tool_result(call) -> dict:
 
 def respond(llm, c=None, *texts):
     texts = texts or ("¿Hablo con Ana López?", "x")
-    return AgentService(llm, FakeScheduling()).respond(c or candidate(), history(*texts), texts[-1], TODAY)
+    return AgentService(llm, FakeScheduling(), FakeKnowledge()).respond(c or candidate(), history(*texts), texts[-1], TODAY)
+
+
+class FakeKnowledge:
+    def __init__(self, fail: bool = False):
+        self.fail = fail
+        self.questions = []
+
+    def search(self, question):
+        self.questions.append(question)
+        if self.fail:
+            raise LLMError("Titan caído")
+        return [KnowledgeMatch(question="¿Necesito vehículo propio?", answer="Sí, coche o moto.", score=0.6)]
 
 
 class FakeScheduling:
@@ -93,7 +106,7 @@ def test_turn_forces_record_answer_then_writes_the_reply():
     llm = ScriptedLLM(record(identity_confirmed="yes"), say("¡Genial, Ana! ¿Tienes carné?"))
     turn = respond(llm, None, "¿Hablo con Ana López?", "sí soy yo")
 
-    assert turn.reply == "¡Genial, Ana! ¿Tienes carné?" and not turn.used_fallback
+    assert turn.reply == "¡Genial, Ana! ¿Tienes carné?"
     assert (turn.decision.action, turn.decision.stage) == (Action.ASK, Stage.LICENSE)
     assert turn.decision.candidate.fields.identity_confirmed == Identity.YES
 
@@ -103,17 +116,27 @@ def test_turn_forces_record_answer_then_writes_the_reply():
     assert "carné de conducir" in tool_result(second)["objective"]  # el código le dice qué toca
 
 
-def test_question_is_answered_with_search_faq():
+@pytest.mark.parametrize("titan_down", [False, True])
+def test_question_is_answered_with_search_faq(titan_down):
+    knowledge = FakeKnowledge(fail=titan_down)
     llm = ScriptedLLM(
-        record(candidate_question="en qué ciudades hay servicio"),
-        faq("en qué ciudades hay servicio"),
-        say("Estamos en Barcelona, Madrid, Sevilla... ¿En cuál te gustaría repartir?"),
+        record(candidate_question="si hace falta moto propia"),
+        faq("¿Necesito vehículo propio para trabajar de repartidor?"),
+        say("Sí, necesitas coche o moto propios. ¿En qué ciudad te gustaría repartir?"),
     )
-    turn = respond(llm, candidate(stage=Stage.ZONE), "¿En qué ciudad?", "¿dónde estáis?")
+    turn = AgentService(llm, FakeScheduling(), knowledge).respond(
+        candidate(stage=Stage.ZONE), history("¿En qué ciudad?", "¿hace falta moto?"), "¿hace falta moto?", TODAY
+    )
 
     assert turn.decision.action == Action.ASK and turn.decision.candidate.reask_counts == {}
     assert "candidate_asked" in tool_result(llm.calls[1])
-    assert "Ciudades con servicio en España" in tool_result(llm.calls[2])["information"]
+    assert knowledge.questions == ["¿Necesito vehículo propio para trabajar de repartidor?"]
+    result = tool_result(llm.calls[2])
+    assert "Ciudades con servicio en España" in result["information"]
+    if titan_down:
+        assert result["faq"] == [] and "faq_note" in result
+    else:
+        assert result["faq"] == [{"question": "¿Necesito vehículo propio?", "answer": "Sí, coche o moto."}]
 
 
 def test_parallel_tool_calls_in_the_forced_step_all_get_a_result():
@@ -170,7 +193,6 @@ def test_failure_before_the_decision_raises(first):
 def test_failure_after_the_decision_uses_the_fixed_text(after_decision):
     llm = ScriptedLLM(record(identity_confirmed="yes"), *after_decision)
     turn = respond(llm)
-    assert turn.used_fallback
     assert turn.decision.stage == Stage.LICENSE  # la decisión se mantiene
     assert turn.reply == "¿Puedes conducir un coche o una moto? Es decir, ¿tienes carné de coche o de moto en vigor?"
 
@@ -180,7 +202,7 @@ def test_failure_after_the_decision_uses_the_fixed_text(after_decision):
 def test_invalid_reply_is_rewritten_once():
     llm = ScriptedLLM(record(identity_confirmed="yes"), say("Perfecto, Ana."), say("Perfecto, Ana. ¿Tienes carné?"))
     turn = respond(llm)
-    assert turn.reply == "Perfecto, Ana. ¿Tienes carné?" and not turn.used_fallback
+    assert turn.reply == "Perfecto, Ana. ¿Tienes carné?"
     rewrite = llm.calls[2]["messages"][-1]["content"][0]["text"]
     assert "Mensaje del sistema" in rewrite and "no tiene ninguna" in rewrite
 
@@ -190,15 +212,22 @@ def test_invented_salary_falls_back_to_the_fixed_text():
     llm = ScriptedLLM(record(candidate_question="cuánto se paga"), salary, salary)
     c = candidate(stage=Stage.AVAILABILITY, fields={"identity_confirmed": "yes", "license": "yes", "city": "Madrid"})
     turn = respond(llm, c, "¿Disponibilidad?", "¿cuánto se paga?")
-    assert turn.used_fallback
-    assert "12" not in turn.reply
+    assert turn.reply == "¿Buscas algo a jornada completa, a media jornada o solo para fines de semana?"  # texto fijo
+
+
+@pytest.mark.parametrize("sentiment, tone", [("frustrated", True), ("neutral", False)])
+def test_sentiment_adds_a_tone_hint_but_does_not_change_the_decision(sentiment, tone):
+    llm = ScriptedLLM(record(identity_confirmed="yes", sentiment=sentiment), say("¿Tienes carné?"))
+    turn = respond(llm)
+    assert (turn.decision.action, turn.decision.stage) == (Action.ASK, Stage.LICENSE)
+    assert ("tone" in tool_result(llm.calls[1])) == tone
 
 
 def test_voice_only_changes_how_the_reply_is_written():
     script = (record(identity_confirmed="yes"), say("¡Genial, Ana! 🙌 ¿Tienes carné?"))
     by_text = respond(ScriptedLLM(*script))
     voice_llm = ScriptedLLM(*script)
-    by_voice = AgentService(voice_llm, FakeScheduling()).respond(
+    by_voice = AgentService(voice_llm, FakeScheduling(), FakeKnowledge()).respond(
         candidate(), history("¿Hablo con Ana López?", "x"), "x", TODAY, channel=Channel.VOICE
     )
     assert (by_voice.decision.action, by_voice.decision.stage) == (by_text.decision.action, by_text.decision.stage)
@@ -210,5 +239,5 @@ def test_truncated_reply_is_rewritten():
     cut = [{"text": "Genial, Ana. ¿Tienes carné de"}, {"truncated": True}]
     llm = ScriptedLLM(record(identity_confirmed="yes"), cut, say("Genial, Ana. ¿Tienes carné?"))
     turn = respond(llm)
-    assert turn.reply == "Genial, Ana. ¿Tienes carné?" and not turn.used_fallback
+    assert turn.reply == "Genial, Ana. ¿Tienes carné?"
     assert "cortado" in llm.calls[2]["messages"][-1]["content"][0]["text"]

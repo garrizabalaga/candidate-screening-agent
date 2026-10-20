@@ -1,6 +1,5 @@
 """Tools del agente. Cada módulo contiene la definición de una tool (nombre,
-descripción y esquema de argumentos) y lo que ejecuta. Son también las piezas que
-se expondrían como webhooks a un agente de voz."""
+descripción y esquema de argumentos) y lo que ejecuta."""
 
 from app.tools import record_answer, search_faq
 

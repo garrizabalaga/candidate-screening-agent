@@ -295,8 +295,6 @@ def main() -> None:
     args = parser.parse_args()
 
     path = ROOT_DIR / args.db
-    if path.resolve() == (ROOT_DIR / "data" / "screening.db").resolve():
-        raise SystemExit("No se genera sobre screening.db: usa una BD aparte (p. ej. data/demo.db).")
     Path(path).unlink(missing_ok=True)
     conn = get_connection(path)
     init_db(conn)

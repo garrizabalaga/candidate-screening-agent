@@ -16,7 +16,6 @@ from app.models.enums import Stage
 from app.services.state_machine import Action, Decision
 from app.tools.record_answer import CLOSING_ACTIONS
 
-# Acciones cuyo mensaje tiene que llevar una pregunta.
 QUESTION_ACTIONS = {Action.ASK, Action.REASK, Action.CONFIRM, Action.OFFER_SLOTS}
 
 # Longitud máxima en palabras. La guía de tono dice ~40; se deja margen. La oferta
@@ -44,7 +43,7 @@ def for_voice(reply: str) -> str:
     raro en el TTS, y en una llamada no hay "este chat" (el seguimiento va por WhatsApp)."""
     text = _FORMATTING.sub("", _EMOJI.sub("", reply))
     text = text.replace("por este chat", "por WhatsApp")
-    return " ".join(text.split())  # sin saltos de línea ni espacios dobles
+    return " ".join(text.split())
 
 
 def problems(reply: str, decision: Decision, context: str) -> list[str]:

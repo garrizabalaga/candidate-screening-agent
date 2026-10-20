@@ -28,7 +28,6 @@ from app.models.enums import (
 )
 from app.models.interview import Slot
 
-# Etapas de preguntas, en orden, y el campo que resuelve cada una.
 STAGE_FIELD: dict[Stage, str] = {
     Stage.IDENTITY: "identity_confirmed",
     Stage.LICENSE: "license",
@@ -65,8 +64,6 @@ class Decision(BaseModel):
     action: Action
     stage: Stage | None = None
     attempt: int = 0
-    # Marca de revisión creada en este turno, para avisar al candidato.
-    new_flag: ReviewFlag | None = None
     # OFFER_SLOTS: True si los huecos ya se habían ofrecido (repregunta o pregunta del candidato);
     # slot_taken: el que eligió se ha ocupado mientras tanto y se le ofrecen otros.
     repeat: bool = False
@@ -84,6 +81,10 @@ def advance(candidate: Candidate, extracted: ExtractedFields, raw_text: str, tod
     # Idioma: None = mezcla o no se sabe -> se mantiene el actual.
     if extracted.language is not None:
         c.language = extracted.language
+
+    # Lenguaje inapropiado: sin discutir ni avisar, lo revisa una persona.
+    if extracted.inappropriate:
+        return _to_manual_review(c, c.stage, "inappropriate_language", raw_text)
 
     if c.stage == Stage.SCHEDULING:
         return _schedule(c, extracted, raw_text)
@@ -107,9 +108,8 @@ def advance(candidate: Candidate, extracted: ExtractedFields, raw_text: str, tod
         return Decision(candidate=c, action=Action.CONFIRM, stage=confirming)
 
     # Confirmación del carné sin un sí o un no claro -> revisión manual (eliminatorio dudoso).
-    new_flag = None
     if confirming == Stage.LICENSE and extracted.license not in (License.YES, License.NO):
-        new_flag = _flag_for_review(c, Stage.LICENSE, raw_text)
+        _flag_for_review(c, Stage.LICENSE, raw_text)
 
     # 4. Eliminatorias, con cualquier campo que haya llegado. El descarte gana a la revisión,
     #    pero antes se confirma: un error de extracción no puede descartar a nadie de una vez.
@@ -135,19 +135,19 @@ def advance(candidate: Candidate, extracted: ExtractedFields, raw_text: str, tod
         if attempts < MAX_REASKS:
             c.reask_counts[current] = attempts + 1
             return Decision(candidate=c, action=Action.REASK, stage=current, attempt=attempts + 1)
-        new_flag = _apply_fallback(c, current, raw_text)
+        _apply_fallback(c, current, raw_text)
 
     # 6. Siguiente etapa: la primera sin resolver (lo ya contestado no se pregunta).
     next_stage = next((s for s in STAGE_FIELD if not _is_resolved(c, s)), None)
     if next_stage is not None:
         c.stage = next_stage
-        return Decision(candidate=c, action=Action.ASK, stage=next_stage, new_flag=new_flag)
+        return Decision(candidate=c, action=Action.ASK, stage=next_stage)
 
     # 7. Todas las preguntas hechas.
     if c.review_flags:
         c.stage = Stage.DONE
         c.outcome = Outcome.MANUAL_REVIEW
-        return Decision(candidate=c, action=Action.MANUAL_REVIEW, new_flag=new_flag)
+        return Decision(candidate=c, action=Action.MANUAL_REVIEW)
     # Apto: pasa a agendar. Los huecos concretos los añade with_slots() (necesitan la BD).
     c.stage = Stage.SCHEDULING
     c.offered_slots = []
@@ -208,12 +208,11 @@ def _schedule(c: Candidate, extracted: ExtractedFields, raw_text: str) -> Decisi
 
 
 def _to_manual_review(c: Candidate, stage: Stage, reason: str, raw_text: str) -> Decision:
-    flag = ReviewFlag(stage=stage, reason=reason, raw_answer=raw_text)
-    c.review_flags.append(flag)
+    c.review_flags.append(ReviewFlag(stage=stage, reason=reason, raw_answer=raw_text))
     c.stage = Stage.DONE
     c.outcome = Outcome.MANUAL_REVIEW
     c.offered_slots = []
-    return Decision(candidate=c, action=Action.MANUAL_REVIEW, new_flag=flag)
+    return Decision(candidate=c, action=Action.MANUAL_REVIEW)
 
 
 # --- Pasos internos -----------------------------------------------------------
@@ -268,22 +267,20 @@ def _is_resolved(c: Candidate, stage: Stage) -> bool:
             return getattr(f, STAGE_FIELD[stage]) is not None
 
 
-def _apply_fallback(c: Candidate, stage: Stage, raw_text: str) -> ReviewFlag | None:
+def _apply_fallback(c: Candidate, stage: Stage, raw_text: str) -> None:
     """Regla de "sigue sin estar claro tras 2 repreguntas" (tabla de validación)."""
     match stage:
         case Stage.IDENTITY | Stage.LICENSE | Stage.ZONE:
-            return _flag_for_review(c, stage, raw_text)
+            _flag_for_review(c, stage, raw_text)
         case _:
-            setattr(c.fields, STAGE_FIELD[stage], UNCLEAR)
-            return None
+            # Validado (no setattr): "unclear" pasa a ser el valor del enum del campo.
+            c.fields = ScreeningFields.model_validate(c.fields.model_dump() | {STAGE_FIELD[stage]: UNCLEAR})
 
 
-def _flag_for_review(c: Candidate, stage: Stage, raw_text: str) -> ReviewFlag:
+def _flag_for_review(c: Candidate, stage: Stage, raw_text: str) -> None:
     """Eliminatorio dudoso -> revisión manual, pero el flujo continúa."""
     if stage == Stage.IDENTITY:
         c.fields.identity_confirmed = Identity.UNCLEAR
     elif stage == Stage.LICENSE:
         c.fields.license = License.UNCLEAR
-    flag = ReviewFlag(stage=stage, reason=f"{stage}_unclear", raw_answer=raw_text)
-    c.review_flags.append(flag)
-    return flag
+    c.review_flags.append(ReviewFlag(stage=stage, reason=f"{stage}_unclear", raw_answer=raw_text))

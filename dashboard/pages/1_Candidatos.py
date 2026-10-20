@@ -132,7 +132,7 @@ if c["outcome"] == "manual_review":
                 st.error("No hay huecos de entrevista libres." if "no interview slots" in str(e) else f"Error de la API: {e}")
             else:
                 st.session_state["review_done"] = {"name": c["full_name"], "message": message}
-                st.rerun()  # la tabla y el detalle muestran el nuevo estado
+                st.rerun()
 
 data, chat = st.columns([1, 2])
 with data:
@@ -150,7 +150,6 @@ with data:
     if c["review_flags"] and c["outcome"] != "manual_review":
         st.caption("Pasó por revisión manual: " + ", ".join(FLAG_LABEL.get(f["reason"], f["reason"]) for f in c["review_flags"]))
 
-    # Resumen post-conversación: los datos clave ya están arriba; aquí, las notas del LLM.
     st.markdown("**📝 Resumen para el recruiter**")
     summary = call(api_client.get_summary, c["id"])
     if summary is None:
@@ -175,5 +174,5 @@ with data:
         st.rerun()
 with chat:
     st.markdown("**Conversación**")
-    with st.container(height=520):  # caja con scroll propio: la conversación no estira la página
+    with st.container(height=520):
         show_conversation(call(api_client.get_messages, c["id"]), c["country"])

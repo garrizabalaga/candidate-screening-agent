@@ -1,16 +1,8 @@
-"""Inicio del panel de recruiters: lo pendiente primero y, después, cómo va el proceso.
+"""Inicio del panel de recruiters: pendientes de revisión y próximas entrevistas,
+cifras del periodo frente al anterior y gráficas del proceso.
 
-1. Pendientes de revisión (lo que espera a un recruiter) y sus próximas entrevistas.
-2. Cifras del periodo, con la variación frente al periodo anterior.
-3. Gráficas: actividad diaria, embudo, abandono por etapa y reparto de resultados.
-
-Las métricas se calculan aquí, a partir de GET /candidates. Con el volumen de la
-demo es suficiente; con miles de candidatos irían a un endpoint de la API (o a
-una vista agregada en la base de datos) para no descargar todos los registros.
-
-Colores (guía de visualización): series en orden fijo azul / naranja / aguamarina,
-embudo en una escala de azul (orden), gris para lo secundario y colores de estado
-(verde / ámbar / rojo) solo para resultados, siempre con su etiqueta.
+Las métricas se calculan aquí, a partir de GET /candidates: suficiente para la demo;
+con miles de candidatos irían a un endpoint o a una vista agregada.
 """
 
 from collections import Counter
@@ -27,9 +19,9 @@ from ui import COUNTRY_LABEL, COUNTRY_TZ, FLAG_LABEL, STAGE_LABEL, call, local_t
 st.set_page_config(page_title="Inicio · Grupo Sazón", page_icon="🛵", layout="wide")
 
 SERIES = {"Candidaturas": "#2a78d6", "Respondieron": "#eb6834", "Aptos": "#1baf7a"}
-FUNNEL_RAMP = ["#86b6ef", "#5598e7", "#2a78d6", "#1c5cab", "#184f95"]  # escala ordinal, de claro a oscuro
+FUNNEL_RAMP = ["#86b6ef", "#5598e7", "#2a78d6", "#1c5cab", "#184f95"]
 ACCENT, MUTED = "#2a78d6", "#c3c2b7"
-RESULTS = {  # resultado -> (etiqueta, color)
+RESULTS = {
     "qualified": ("Apto", "#0ca30c"),
     "manual_review": ("Revisión", "#fab219"),
     "disqualified": ("Descartado", "#d03b3b"),
@@ -38,7 +30,7 @@ RESULTS = {  # resultado -> (etiqueta, color)
     None: ("En curso", "#2a78d6"),
 }
 REVIEW_PROMISE_HOURS = 48  # al candidato se le dice "te responderemos en 24-48 h"
-LIST_HEIGHT = 220  # alto de las listas de pendientes y entrevistas (con scroll)
+LIST_HEIGHT = 220
 
 now = datetime.now(timezone.utc)
 candidates = call(api_client.list_candidates)
@@ -93,7 +85,7 @@ with review.container(border=True):
             f"{len(late)} fuera de plazo (más de {REVIEW_PROMISE_HOURS} h)" if late
             else f"Todos dentro del plazo de {REVIEW_PROMISE_HOURS} h prometido al candidato"
         )
-        with st.container(height=LIST_HEIGHT, border=False):  # scroll propio: no empuja las cifras hacia abajo
+        with st.container(height=LIST_HEIGHT, border=False):
             for c in pending:
                 hours = (now - ts(c["last_candidate_message_at"])).total_seconds() / 3600
                 mark = "🔴" if hours > REVIEW_PROMISE_HOURS else "🟡" if hours > 24 else "⚪"

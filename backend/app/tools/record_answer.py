@@ -22,6 +22,7 @@ from app.prompts.slots import format_slot, numbered
 from app.prompts.stages import closed_options, question, rephrase
 from app.services.scheduling_service import SchedulingService, SlotTaken
 from app.services.state_machine import Action, Decision, advance, with_slots
+from app.tools import search_faq
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +37,9 @@ def run(candidate: Candidate, raw: dict, text: str, today: date, scheduling: Sch
     extracted = parse(raw)
     decision = advance(candidate, extracted, text, today)
 
-    # Acaba de ser apto: el código elige los huecos a ofrecer.
     if decision.action == Action.OFFER_SLOTS and not decision.candidate.offered_slots:
         decision = with_slots(decision, scheduling.available_slots(decision.candidate))
 
-    # Ha elegido hueco: se reserva. Si se ha ocupado mientras tanto, se le ofrecen otros.
     elif decision.action == Action.BOOKED:
         try:
             scheduling.book(decision.candidate, decision.slot)
@@ -88,15 +87,25 @@ def parse(raw: dict) -> ExtractedFields:
         return ExtractedFields.model_validate(valid)
 
 
-def result(decision: Decision, candidate_question: str | None, search_tool: str) -> dict:
-    """Lo que la tool devuelve al agente: qué ha decidido el código."""
+TONE = {
+    "frustrated": "Parece molesto o impaciente: reconócelo en pocas palabras, sin disculpas largas, y ve al grano.",
+    "confused": "Parece que no entiende qué se le pide o por qué: explícaselo en una frase sencilla antes de preguntar.",
+}
+
+
+def result(decision: Decision, extracted: ExtractedFields) -> dict:
+    """Lo que la tool devuelve al agente: qué ha decidido el código y cómo decirlo."""
     out = {
         "objective": objective(decision),
         "reply_language": _LANGUAGE[decision.candidate.language],
         "conversation_closed": decision.action in CLOSING_ACTIONS,
     }
-    if candidate_question:
-        out["candidate_asked"] = f'"{candidate_question}": búscalo con {search_tool} y respóndelo antes del objetivo.'
+    if extracted.candidate_question:
+        out["candidate_asked"] = (
+            f'"{extracted.candidate_question}": búscalo con {search_faq.NAME} y respóndelo antes del objetivo.'
+        )
+    if extracted.sentiment in TONE:
+        out["tone"] = TONE[extracted.sentiment]
     return out
 
 
@@ -108,8 +117,9 @@ def objective(decision: Decision) -> str:
             return f"averiguar {question(decision.stage, c)}. Enlaza con naturalidad con lo que acaba de decir."
         case Action.REASK if decision.attempt == 1:
             return (
-                f"todavía no sabes {question(decision.stage, c)}: su respuesta no lo aclara. Ayúdale a responder "
-                f'preguntándolo de otra forma, más sencilla. Por ejemplo: "{rephrase(decision.stage, c)}"'
+                f"todavía no sabes {question(decision.stage, c)}: su respuesta no lo aclara. Vuelve a preguntar lo "
+                f"mismo de forma más sencilla, sin cambiar de tema ni añadir otras preguntas. Usa esta formulación o "
+                f'una muy parecida: "{rephrase(decision.stage, c)}"'
             )
         case Action.REASK:
             options = " / ".join(closed_options(decision.stage, c))
@@ -140,6 +150,11 @@ def objective(decision: Decision) -> str:
             return (
                 f"explicarle que por ahora no hay servicio en {c.fields.city}, agradecerle su interés y decirle que "
                 f"le avisaremos si se abre su zona. {close}"
+            )
+        case Action.MANUAL_REVIEW if c.review_flags and c.review_flags[-1].reason == "inappropriate_language":
+            return (
+                "su último mensaje ha sido ofensivo. Sin reprocharle nada ni repetir sus palabras, dile con calma que "
+                f"un compañero del equipo revisará su caso y le responderá por este chat. {close}"
             )
         case Action.MANUAL_REVIEW:
             return (

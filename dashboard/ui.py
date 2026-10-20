@@ -38,6 +38,7 @@ FLAG_LABEL = {
     "no_slot_fits": "Ningún hueco de entrevista le encaja",
     "scheduling_unclear": "No eligió hueco de entrevista",
     "no_slots_available": "No había huecos libres",
+    "inappropriate_language": "Lenguaje inapropiado hacia el asistente",
 }
 VALUE_LABEL = {
     "yes": "Sí", "no": "No", "unclear": "No está claro",
@@ -69,7 +70,7 @@ def value(v) -> str:
     """Un campo del screening en lenguaje natural."""
     if v is None:
         return "—"
-    if isinstance(v, dict):  # experiencia
+    if isinstance(v, dict):
         years = v["years"]
         platforms = ", ".join(v["platforms"]) or "sin plataformas"
         return "Sin experiencia" if years == 0 else f"{years:g} años ({platforms})"

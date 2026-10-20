@@ -1,12 +1,8 @@
 """Revisión manual: un recruiter aprueba o descarta un caso dudoso.
 
-Cierra la promesa que se le hizo al candidato ("te responderemos por este chat
-en 24-48 h"): la respuesta llega por el mismo chat, iniciada por el sistema.
-- Aprobar: se le ofrecen huecos de entrevista; a partir de ahí el agente sigue
-  la conversación como con cualquier candidato apto.
+La respuesta llega al candidato por el mismo chat (se le prometió en 24-48 h):
+- Aprobar: se le ofrecen huecos y sigue como cualquier candidato apto.
 - Descartar: mensaje de cierre.
-
-Los mensajes son textos fijos: los inicia la empresa (en WhatsApp, plantillas).
 """
 
 import sqlite3
@@ -64,7 +60,7 @@ class ReviewService:
             if decision.action != Action.OFFER_SLOTS:
                 # Sin huecos libres: el caso sigue en revisión y no se le escribe nada.
                 raise NoSlotsAvailable(candidate_id)
-            text = fallback(decision)  # "¡Buenas noticias! Cumples los requisitos. ¿Cuál de estos huecos…?"
+            text = fallback(decision)
         else:
             text = REJECTION[candidate.language].format(name=candidate.full_name.split()[0])
 

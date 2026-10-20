@@ -1,30 +1,10 @@
-"""Canal de voz (ElevenLabs).
+"""Canal de voz (ElevenLabs). Detalle y configuración en docs/architecture.md §11.
 
-- GET /voice/{candidate_id}: el enlace que recibe el candidato. Redirige a la página
-  del agente de ElevenLabs (talk-to) con dos variables dinámicas: candidate_id y
-  saludo (calculado en ese momento según la etapa).
-- POST /voice/llm/chat/completions: el "LLM" al que llama el agente de voz de ElevenLabs.
-
-ElevenLabs hace la voz (transcribe al candidato y lee la respuesta) y, para saber
-qué contestar, llama a este endpoint como si fuera OpenAI (opción "Custom LLM").
-Aquí no hay un LLM nuevo: es otra puerta al mismo turno que POST /chat.
-
-- El candidato llega dentro del system prompt que envía ElevenLabs: el prompt del
-  agente en su consola lleva la línea `candidate_id={{candidate_id}}` y ElevenLabs
-  la rellena con la variable del enlace. Es la única vía con su página (talk-to):
-  no permite enviar datos aparte al Custom LLM. Si alguien borra esa línea del
-  prompt, las llamadas dan 400.
-- De `messages` solo se usa el último mensaje del usuario (lo que acaba de decir).
-  El historial y el estado buenos son los de nuestra BD, y el prompt que envíe
-  ElevenLabs se ignora: el nuestro es el de siempre, en modo voz.
-- La respuesta va en streaming (SSE, formato de OpenAI), como exige ElevenLabs,
-  pero en un solo trozo: el mensaje no se puede enviar hasta que reply_guard lo
-  ha validado. La espera del turno (~3 s) la tapa ElevenLabs con su "soft
-  timeout": si no respondemos en ~1,5 s, dice una frase de relleno configurada en
-  su consola. Solo suena cuando hace falta, no en todos los turnos.
-- Antes de procesarse, cada turno espera VOICE_DEBOUNCE_SECONDS: si en ese margen
-  llega otra petición del mismo candidato (ElevenLabs ha descartado esta porque el
-  candidato siguió hablando), se retira sin hacer nada. Ver services/voice_requests.py.
+- GET /voice/{candidate_id}: el enlace del candidato. Redirige a la página del agente
+  de ElevenLabs con el candidate_id y el saludo (según la etapa en ese momento).
+- POST /voice/llm/chat/completions: el Custom LLM al que llama ElevenLabs. Es otra
+  puerta al mismo turno que POST /chat; el candidate_id llega en la línea
+  `candidate_id=...` del system prompt del agente.
 """
 
 import json
@@ -40,14 +20,15 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
-from app.clients.aws_client import BedrockClient
+from app.clients.aws_client import BedrockClient, EmbeddingClient
 from app.core.config import ELEVENLABS_AGENT_ID, VOICE_DEBOUNCE_SECONDS, VOICE_LLM_API_KEY
 from app.models.enums import Channel
 from app.prompts import voice as voice_prompts
 from app.repositories.candidate_repository import CandidateRepository
-from app.routes.dependencies import get_agent_llm, get_db, get_summary_job, get_voice_requests
+from app.routes.dependencies import get_agent_llm, get_db, get_embeddings, get_summary_job, get_voice_requests
 from app.services.agent_service import AgentService
 from app.services.chat_service import FALLBACK_REPLY, ChatService
+from app.services.knowledge_service import KnowledgeService
 from app.services.scheduling_service import SchedulingService
 from app.services.voice_requests import VoiceRequests
 
@@ -81,6 +62,7 @@ def chat_completions(
     background: BackgroundTasks,
     conn: sqlite3.Connection = Depends(get_db),
     llm: BedrockClient = Depends(get_agent_llm),
+    embeddings: EmbeddingClient = Depends(get_embeddings),
     summary_job: Callable[[str], None] = Depends(get_summary_job),
     requests: VoiceRequests = Depends(get_voice_requests),
 ) -> StreamingResponse:
@@ -94,7 +76,7 @@ def chat_completions(
     if candidate is None:
         raise HTTPException(status_code=404, detail="candidate not found")
 
-    service = ChatService(conn, AgentService(llm, SchedulingService(conn)))
+    service = ChatService(conn, AgentService(llm, SchedulingService(conn), KnowledgeService(conn, embeddings)))
     number = requests.register(candidate_id)  # al llegar, no tras la espera
 
     def stream() -> Iterator[str]:

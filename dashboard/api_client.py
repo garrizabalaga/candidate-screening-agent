@@ -92,3 +92,15 @@ def list_recruiters(country: str | None = None) -> list[dict]:
 def recruiter_calendar(recruiter_id: str, start: date, end: date) -> list[dict]:
     params = {"from": start.isoformat(), "to": end.isoformat()}
     return _request("GET", f"/recruiters/{recruiter_id}/interviews", params=params)
+
+
+# --- Base de conocimiento (FAQ) -------------------------------------------------------
+
+def upload_faq(filename: str, content: bytes) -> dict:
+    """Sube el FAQ y regenera la base (un embedding por pregunta: unos segundos)."""
+    files = {"file": (filename, content, "text/markdown")}
+    return _request("POST", "/knowledge", timeout=CHAT_TIMEOUT, files=files)
+
+
+def list_faq() -> list[dict]:
+    return _request("GET", "/knowledge")

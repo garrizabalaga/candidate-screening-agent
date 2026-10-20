@@ -32,7 +32,6 @@ if not entries:
     st.info("No tiene entrevistas en este periodo.")
     st.stop()
 
-# Agrupar por día, en la hora local del país del recruiter.
 tz = COUNTRY_TZ[recruiter["country"]]
 by_day = defaultdict(list)
 for e in entries:

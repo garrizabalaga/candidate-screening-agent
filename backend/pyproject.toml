@@ -9,6 +9,7 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn>=0.30",
     "boto3>=1.39",
+    "python-multipart>=0.0.9",
     "tzdata",  # zonas horarias para zoneinfo (Windows no las trae)
 ]
 

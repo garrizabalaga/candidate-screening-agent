@@ -1,16 +1,8 @@
-"""Vista del candidato (simulador): hablar con Guille como si fueras el candidato.
+"""Vista del candidato: hablar con Guille como si fueras el candidato (sustituye a WhatsApp).
 
-No es parte del panel de recruiters: en producción el candidato escribe por
-WhatsApp y, si lo prefiere, habla por voz con el enlace del mensaje de apertura.
-Aquí el chat sustituye a WhatsApp, y ese enlace se puede pulsar desde el propio chat.
-
-Experiencia de chat:
-- El chat es un fragmento (@st.fragment): al enviar un mensaje solo se vuelve a
-  ejecutar ese bloque, no la página entera.
-- La conversación vive en la sesión: tu mensaje aparece al instante y la
-  respuesta se añade cuando llega, sin recargar nada.
-- "Actualizar" vuelve a leerla de la API, para ver los mensajes que inicia el
-  sistema (apertura, recordatorios).
+El chat es un @st.fragment y la conversación vive en la sesión: al enviar un mensaje
+solo se vuelve a ejecutar el chat, tu mensaje aparece al instante y la respuesta se
+añade cuando llega. "Actualizar" relee de la API (apertura, recordatorios).
 """
 
 from datetime import datetime, timezone
@@ -66,7 +58,7 @@ def chat(candidate_id: str) -> None:
     s = st.session_state[f"status_{candidate_id}"]
     status.caption(f"Etapa: {STAGE_LABEL[s['stage']]} · {OUTCOME_LABEL[s['outcome']]}")
 
-    box = st.container(height=520)  # caja con scroll propio, como una app de mensajería
+    box = st.container(height=520)
     with box:
         for m in messages:
             render_message(m, country)
@@ -75,7 +67,7 @@ def chat(candidate_id: str) -> None:
         mine = {"role": "candidate", "text": text, "created_at": datetime.now(timezone.utc).isoformat()}
         messages.append(mine)
         with box:
-            render_message(mine, country)  # aparece al instante
+            render_message(mine, country)
             with st.chat_message("assistant", avatar="🤖"):
                 with st.spinner("Guille está escribiendo…"):
                     reply = call(api_client.send_message, candidate_id, text)

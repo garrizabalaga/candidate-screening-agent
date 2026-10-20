@@ -75,6 +75,16 @@ CREATE TABLE IF NOT EXISTS summaries (
     generated_at    TEXT NOT NULL
 );
 
+-- Base de conocimiento (FAQ): una fila por pregunta, con su embedding. Se regenera al subir un FAQ.
+CREATE TABLE IF NOT EXISTS knowledge_chunks (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    source          TEXT NOT NULL,
+    question        TEXT NOT NULL,
+    answer          TEXT NOT NULL,
+    embedding       TEXT NOT NULL,                      -- JSON
+    created_at      TEXT NOT NULL
+);
+
 -- La base de datos garantiza que no hay dobles reservas, aunque dos candidatos
 -- confirmen a la vez: un recruiter no puede tener dos entrevistas a la misma hora,
 -- y un candidato no puede tener dos entrevistas activas. Índices parciales: una
